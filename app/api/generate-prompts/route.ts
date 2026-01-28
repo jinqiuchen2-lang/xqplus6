@@ -157,12 +157,16 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2)
       if (response.status < 500 || response.status === 401 || response.status === 403) {
         return response;
       }
+      // Log error details before retry
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
       // Retry on 5xx errors
       if (i < maxRetries) {
         console.log(`Retry ${i + 1}/${maxRetries} after ${response.status} error`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
       }
     } catch (error) {
+      console.error('Network error:', error);
       if (i === maxRetries) {
         throw error;
       }
