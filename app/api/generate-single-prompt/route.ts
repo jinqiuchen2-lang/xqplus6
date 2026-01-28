@@ -151,20 +151,21 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2)
       if (response.status < 500 || response.status === 401 || response.status === 403) {
         return response;
       }
-      // Log error details before retry
-      const errorText = await response.text();
-      console.error(`API Error (${response.status}):`, errorText);
+      // Log error without consuming response body
+      console.error(`API Error (${response.status}) - will retry`);
       // Retry on 5xx errors
       if (i < maxRetries) {
         console.log(`Retry ${i + 1}/${maxRetries} after ${response.status} error`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+      } else {
+        // Last attempt failed, throw the response for error handling
+        throw response;
       }
     } catch (error) {
-      console.error('Network error:', error);
       if (i === maxRetries) {
         throw error;
       }
-      console.log(`Retry ${i + 1}/${maxRetries} after network error`);
+      console.log(`Retry ${i + 1}/${maxRetries} after error`);
       await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
     }
   }
@@ -312,8 +313,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ prompt });
   } catch (error) {
     console.error('Error in generate-single-prompt API:', error);
-    const errorMessage = error instanceof Error ? error.message : '生成提示词失败，请稍后重试';
 
+    // Handle Response objects from failed retries
+    if (error instanceof Response) {
+      const errorText = await error.text();
+      console.error('API Response error:', error.status, errorText);
+
+      let errorMessage = '生成提示词失败，请稍后重试';
+      if (error.status === 401) {
+        errorMessage = 'API密钥无效，请检查配置';
+      } else if (error.status === 403) {
+        errorMessage = 'API访问被拒绝，请检查权限';
+      } else if (error.status === 429) {
+        errorMessage = '请求过于频繁，请稍后再试';
+      } else if (error.status >= 500) {
+        errorMessage = 'API服务暂时不可用，请稍后重试';
+      }
+
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: error.status }
+      );
+    }
+
+    const errorMessage = error instanceof Error ? error.message : '生成提示词失败，请稍后重试';
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
