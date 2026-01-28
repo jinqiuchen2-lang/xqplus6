@@ -1,0 +1,291 @@
+{\rtf1\ansi\ansicpg936\cocoartf2709
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 HelveticaNeue;}
+{\colortbl;\red255\green255\blue255;\red39\green48\blue66;\red255\green255\blue255;}
+{\*\expandedcolortbl;;\cssrgb\c20392\c25098\c32941;\cssrgb\c100000\c100000\c100000;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs28 \cf2 \cb3 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 # Chat(\uc0\u32842 \u22825 )\
+\
+## OpenAPI Specification\
+\
+```yaml\
+openapi: 3.0.1\
+info:\
+  title: ''\
+  description: ''\
+  version: 1.0.0\
+paths:\
+  /v1/chat/completions:\
+    post:\
+      summary: Chat(\uc0\u32842 \u22825 )\
+      deprecated: false\
+      description: >+\
+        [\uc0\u23448 \u26041 \u25351 \u21335 ](https://platform.openai.com/docs/guides/text-generation/chat-completions-api)\
+\
+        [\uc0\u23448 \u26041 API\u25991 \u26723 ](https://platform.openai.com/docs/api-reference/chat)\
+\
+        \uc0\u25152 \u26377 \u23545 \u35805 \u27169 \u22411 \u65292 \u37117 \u21487 \u20351 \u29992 \u27492 \u25509 \u21475 \u65292  \u20462 \u25913  model \u23646 \u24615 \u20026 \u27169 \u22411 \u21517 \
+\
+        \uc0\u32473 \u23450 \u19968 \u20010 \u25552 \u31034 \u65292 \u35813 \u27169 \u22411 \u23558 \u36820 \u22238 \u19968 \u20010 \u25110 \u22810 \u20010 \u39044 \u27979 \u30340 \u23436 \u25104 \u65292 \u24182 \u19988 \u36824 \u21487 \u20197 \u36820 \u22238 \u27599 \u20010 \u20301 \u32622 \u30340 \u26367 \u20195 \u26631 \u35760 \u30340 \u27010 \u29575 \u12290 \
+\
+        \uc0\u20026 \u25552 \u20379 \u30340 \u25552 \u31034 \u21644 \u21442 \u25968 \u21019 \u24314 \u23436 \u25104 \
+\
+\
+      tags:\
+        - \uc0\u32842 \u22825 (Chat)\
+      parameters:\
+        - name: Content-Type\
+          in: header\
+          description: ''\
+          required: true\
+          example: application/json\
+          schema:\
+            type: string\
+        - name: Accept\
+          in: header\
+          description: ''\
+          required: true\
+          example: application/json\
+          schema:\
+            type: string\
+        - name: Authorization\
+          in: header\
+          description: ''\
+          required: false\
+          example: Bearer \{\{YOUR_API_KEY\}\}\
+          schema:\
+            type: string\
+            default: Bearer \{\{YOUR_API_KEY\}\}\
+      requestBody:\
+        content:\
+          application/json:\
+            schema:\
+              type: object\
+              properties:\
+                model:\
+                  type: string\
+                  description: |+\
+                    \uc0\u35201 \u20351 \u29992 \u30340 \u27169 \u22411 \u30340  ID\u12290 \u26377 \u20851 \u21738 \u20123 \u27169 \u22411 \u21487 \u19982 \u32842 \u22825  API \u19968 \u36215 \u20351 \u29992 \u30340 \u35814 \u32454 \u20449 \u24687 ,\u35831 \u21442 \u38405 \u27169 \u22411 \u31471 \u28857 \u20860 \u23481 \u24615 \u34920 \u12290 \
+\
+                messages:\
+                  type: array\
+                  items:\
+                    type: object\
+                    properties:\
+                      role:\
+                        type: string\
+                      content:\
+                        type: string\
+                    x-apifox-orders:\
+                      - role\
+                      - content\
+                  description: \uc0\u33267 \u20170 \u20026 \u27490 \u23545 \u35805 \u25152 \u21253 \u21547 \u30340 \u28040 \u24687 \u21015 \u34920 \u12290 Python \u20195 \u30721 \u31034 \u20363 \u12290 \
+                temperature:\
+                  type: integer\
+                  description: >-\
+                    \uc0\u20351 \u29992 \u20160 \u20040 \u37319 \u26679 \u28201 \u24230 \u65292 \u20171 \u20110  0 \u21644  2 \u20043 \u38388 \u12290 \u36739 \u39640 \u30340 \u20540 \u65288 \u22914  0.8\u65289 \u23558 \u20351 \u36755 \u20986 \u26356 \u21152 \u38543 \u26426 \u65292 \u32780 \u36739 \u20302 \u30340 \u20540 \u65288 \u22914 \
+                    0.2\uc0\u65289 \u23558 \u20351 \u36755 \u20986 \u26356 \u21152 \u38598 \u20013 \u21644 \u30830 \u23450 \u12290   \u25105 \u20204 \u36890 \u24120 \u24314 \u35758 \u25913 \u21464 \u36825 \u20010 \u25110 `top_p`\u20294 \u19981 \u26159 \u20004 \u32773 \u12290 \
+                top_p:\
+                  type: integer\
+                  description: >-\
+                    \uc0\u19968 \u31181 \u26367 \u20195 \u28201 \u24230 \u37319 \u26679 \u30340 \u26041 \u27861 \u65292 \u31216 \u20026 \u26680 \u37319 \u26679 \u65292 \u20854 \u20013 \u27169 \u22411 \u32771 \u34385 \u20855 \u26377  top_p \u27010 \u29575 \u36136 \u37327 \u30340 \u26631 \u35760 \u30340 \u32467 \u26524 \u12290 \u25152 \u20197  0.1 \u24847 \u21619 \u30528 \u21482 \u32771 \u34385 \u26500 \u25104 \u21069 \
+                    10% \uc0\u27010 \u29575 \u36136 \u37327 \u30340 \u26631 \u35760 \u12290   \u25105 \u20204 \u36890 \u24120 \u24314 \u35758 \u25913 \u21464 \u36825 \u20010 \u25110 `temperature`\u20294 \u19981 \u26159 \u20004 \u32773 \u12290 \
+                'n':\
+                  type: integer\
+                  description: |-\
+                    \uc0\u40664 \u35748 \u20026  1\
+                    \uc0\u20026 \u27599 \u20010 \u36755 \u20837 \u28040 \u24687 \u29983 \u25104 \u22810 \u23569 \u20010 \u32842 \u22825 \u34917 \u20840 \u36873 \u25321 \u12290 \
+                stream:\
+                  type: boolean\
+                  description: >-\
+                    \uc0\u40664 \u35748 \u20026  false \u22914 \u26524 \u35774 \u32622 ,\u21017 \u20687 \u22312  ChatGPT\
+                    \uc0\u20013 \u19968 \u26679 \u20250 \u21457 \u36865 \u37096 \u20998 \u28040 \u24687 \u22686 \u37327 \u12290 \u26631 \u35760 \u23558 \u20197 \u20165 \u25968 \u25454 \u30340 \u26381 \u21153 \u22120 \u21457 \u36865 \u20107 \u20214 \u30340 \u24418 \u24335 \u21457 \u36865 ,\u36825 \u20123 \u20107 \u20214 \u22312 \u21487 \u29992 \u26102 ,\u24182 \u22312  data: [DONE]\
+                    \uc0\u28040 \u24687 \u32456 \u27490 \u27969 \u12290 Python \u20195 \u30721 \u31034 \u20363 \u12290 \
+                stop:\
+                  type: string\
+                  description: \uc0\u40664 \u35748 \u20026  null \u26368 \u22810  4 \u20010 \u24207 \u21015 ,API \u23558 \u20572 \u27490 \u36827 \u19968 \u27493 \u29983 \u25104 \u26631 \u35760 \u12290 \
+                max_tokens:\
+                  type: integer\
+                  description: |-\
+                    \uc0\u40664 \u35748 \u20026  inf\
+                    \uc0\u22312 \u32842 \u22825 \u34917 \u20840 \u20013 \u29983 \u25104 \u30340 \u26368 \u22823 \u26631 \u35760 \u25968 \u12290 \
+\
+                    \uc0\u36755 \u20837 \u26631 \u35760 \u21644 \u29983 \u25104 \u26631 \u35760 \u30340 \u24635 \u38271 \u24230 \u21463 \u27169 \u22411 \u30340 \u19978 \u19979 \u25991 \u38271 \u24230 \u38480 \u21046 \u12290 \u35745 \u31639 \u26631 \u35760 \u30340  Python \u20195 \u30721 \u31034 \u20363 \u12290 \
+                presence_penalty:\
+                  type: number\
+                  description: >-\
+                    -2.0 \uc0\u21644  2.0 \u20043 \u38388 \u30340 \u25968 \u23383 \u12290 \u27491 \u20540 \u20250 \u26681 \u25454 \u21040 \u30446 \u21069 \u20026 \u27490 \u26159 \u21542 \u20986 \u29616 \u22312 \u25991 \u26412 \u20013 \u26469 \u24809 \u32602 \u26032 \u26631 \u35760 \u65292 \u20174 \u32780 \u22686 \u21152 \u27169 \u22411 \u35848 \u35770 \u26032 \u20027 \u39064 \u30340 \u21487 \u33021 \u24615 \u12290  \
+                    [\uc0\u26597 \u30475 \u26377 \u20851 \u39057 \u29575 \u21644 \u23384 \u22312 \u24809 \u32602 \u30340 \u26356 \u22810 \u20449 \u24687 \u12290 ](https://platform.openai.com/docs/api-reference/parameter-details)\
+                frequency_penalty:\
+                  type: number\
+                  description: >-\
+                    \uc0\u40664 \u35748 \u20026  0 -2.0 \u21040  2.0 \u20043 \u38388 \u30340 \u25968 \u23383 \u12290 \u27491 \u20540 \u26681 \u25454 \u25991 \u26412 \u30446 \u21069 \u30340 \u23384 \u22312 \u39057 \u29575 \u24809 \u32602 \u26032 \u26631 \u35760 ,\u38477 \u20302 \u27169 \u22411 \u37325 \u22797 \u30456 \u21516 \u34892 \u30340 \u21487 \u33021 \u24615 \u12290  \
+                    \uc0\u26377 \u20851 \u39057 \u29575 \u21644 \u23384 \u22312 \u24809 \u32602 \u30340 \u26356 \u22810 \u20449 \u24687 \u12290 \
+                logit_bias:\
+                  type: 'null'\
+                  description: >-\
+                    \uc0\u20462 \u25913 \u25351 \u23450 \u26631 \u35760 \u20986 \u29616 \u22312 \u34917 \u20840 \u20013 \u30340 \u21487 \u33021 \u24615 \u12290 \
+\
+\
+                    \uc0\u25509 \u21463 \u19968 \u20010  JSON \u23545 \u35937 ,\u35813 \u23545 \u35937 \u23558 \u26631 \u35760 (\u30001 \u26631 \u35760 \u22120 \u25351 \u23450 \u30340 \u26631 \u35760  ID)\u26144 \u23556 \u21040 \u30456 \u20851 \u30340 \u20559 \u24046 \u20540 (-100 \u21040 \
+                    100)\uc0\u12290 \u20174 \u25968 \u23398 \u19978 \u35762 ,\u20559 \u24046 \u22312 \u23545 \u27169 \u22411 \u36827 \u34892 \u37319 \u26679 \u20043 \u21069 \u28155 \u21152 \u21040 \u27169 \u22411 \u29983 \u25104 \u30340  logit \u20013 \u12290 \u30830 \u20999 \u25928 \u26524 \u22240 \u27169 \u22411 \u32780 \u24322 ,\u20294 -1 \u21644  1\
+                    \uc0\u20043 \u38388 \u30340 \u20540 \u24212 \u20943 \u23569 \u25110 \u22686 \u21152 \u30456 \u20851 \u26631 \u35760 \u30340 \u36873 \u25321 \u21487 \u33021 \u24615 ;\u22914 -100 \u25110  100 \u36825 \u26679 \u30340 \u20540 \u24212 \u23548 \u33268 \u30456 \u20851 \u26631 \u35760 \u30340 \u31105 \u29992 \u25110 \u29420 \u21344 \u36873 \u25321 \u12290 \
+                user:\
+                  type: string\
+                  description: >-\
+                    \uc0\u20195 \u34920 \u24744 \u30340 \u26368 \u32456 \u29992 \u25143 \u30340 \u21807 \u19968 \u26631 \u35782 \u31526 \u65292 \u21487 \u20197 \u24110 \u21161  OpenAI\
+                    \uc0\u30417 \u25511 \u21644 \u26816 \u27979 \u28389 \u29992 \u34892 \u20026 \u12290 [\u20102 \u35299 \u26356 \u22810 ](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids)\u12290 \
+                response_format:\
+                  type: object\
+                  properties: \{\}\
+                  x-apifox-orders: []\
+                  description: >-\
+                    \uc0\u25351 \u23450 \u27169 \u22411 \u24517 \u39035 \u36755 \u20986 \u30340 \u26684 \u24335 \u30340 \u23545 \u35937 \u12290   \u23558  \{ "type": "json_object" \} \u21551 \u29992  JSON\
+                    \uc0\u27169 \u24335 ,\u36825 \u21487 \u20197 \u30830 \u20445 \u27169 \u22411 \u29983 \u25104 \u30340 \u28040 \u24687 \u26159 \u26377 \u25928 \u30340  JSON\u12290   \u37325 \u35201 \u25552 \u31034 :\u20351 \u29992  JSON\
+                    \uc0\u27169 \u24335 \u26102 ,\u36824 \u24517 \u39035 \u36890 \u36807 \u31995 \u32479 \u25110 \u29992 \u25143 \u28040 \u24687 \u25351 \u31034 \u27169 \u22411 \u29983 \u25104 \
+                    JSON\uc0\u12290 \u22914 \u26524 \u19981 \u36825 \u26679 \u20570 ,\u27169 \u22411 \u21487 \u33021 \u20250 \u29983 \u25104 \u26080 \u20241 \u27490 \u30340 \u31354 \u30333 \u27969 ,\u30452 \u21040 \u29983 \u25104 \u36798 \u21040 \u20196 \u29260 \u38480 \u21046 ,\u20174 \u32780 \u23548 \u33268 \u24310 \u36831 \u22686 \u21152 \u21644 \u35831 \u27714 \'93\u21345 \u20303 \'94\u30340 \u22806 \u35266 \u12290 \u21478 \u35831 \u27880 \u24847 ,\u22914 \u26524 \
+                    finish_reason="length",\uc0\u21017 \u28040 \u24687 \u20869 \u23481 \u21487 \u33021 \u20250 \u34987 \u37096 \u20998 \u20999 \u26029 ,\u36825 \u34920 \u31034 \u29983 \u25104 \u36229 \u36807 \u20102  max_tokens\
+                    \uc0\u25110 \u23545 \u35805 \u36229 \u36807 \u20102 \u26368 \u22823 \u19978 \u19979 \u25991 \u38271 \u24230 \u12290   \u26174 \u31034 \u23646 \u24615 \
+                seen:\
+                  type: integer\
+                  description: >-\
+                    \uc0\u27492 \u21151 \u33021 \u22788 \u20110 \u27979 \u35797 \u38454 \u27573 \u12290 \u22914 \u26524 \u25351 \u23450 ,\u25105 \u20204 \u30340 \u31995 \u32479 \u23558 \u23613 \u26368 \u22823 \u21162 \u21147 \u30830 \u23450 \u24615 \u22320 \u36827 \u34892 \u37319 \u26679 ,\u20197 \u20415 \u20351 \u29992 \u30456 \u21516 \u30340 \u31181 \u23376 \u21644 \u21442 \u25968 \u36827 \u34892 \u37325 \u22797 \u35831 \u27714 \u24212 \u36820 \u22238 \u30456 \u21516 \u30340 \u32467 \u26524 \u12290 \u19981 \u33021 \u20445 \u35777 \u30830 \u23450 \u24615 ,\u24744 \u24212 \u35813 \u21442 \u32771 \
+                    system_fingerprint \uc0\u21709 \u24212 \u21442 \u25968 \u26469 \u30417 \u25511 \u21518 \u31471 \u30340 \u26356 \u25913 \u12290 \
+                tools:\
+                  type: array\
+                  items:\
+                    type: string\
+                  description: \uc0\u27169 \u22411 \u21487 \u20197 \u35843 \u29992 \u30340 \u19968 \u32452 \u24037 \u20855 \u21015 \u34920 \u12290 \u30446 \u21069 ,\u21482 \u25903 \u25345 \u20316 \u20026 \u24037 \u20855 \u30340 \u20989 \u25968 \u12290 \u20351 \u29992 \u27492 \u21151 \u33021 \u26469 \u25552 \u20379 \u27169 \u22411 \u21487 \u20197 \u20026 \u20043 \u29983 \u25104  JSON \u36755 \u20837 \u30340 \u20989 \u25968 \u21015 \u34920 \u12290 \
+                tool_choice:\
+                  type: object\
+                  properties: \{\}\
+                  description: >-\
+                    \uc0\u25511 \u21046 \u27169 \u22411 \u35843 \u29992 \u21738 \u20010 \u20989 \u25968 (\u22914 \u26524 \u26377 \u30340 \u35805 )\u12290 none \u34920 \u31034 \u27169 \u22411 \u19981 \u20250 \u35843 \u29992 \u20989 \u25968 ,\u32780 \u26159 \u29983 \u25104 \u28040 \u24687 \u12290 auto\
+                    \uc0\u34920 \u31034 \u27169 \u22411 \u21487 \u20197 \u22312 \u29983 \u25104 \u28040 \u24687 \u21644 \u35843 \u29992 \u20989 \u25968 \u20043 \u38388 \u36827 \u34892 \u36873 \u25321 \u12290 \u36890 \u36807  \{"type": "function", "function":\
+                    \{"name": "my_function"\}\} \uc0\u24378 \u21046 \u27169 \u22411 \u35843 \u29992 \u35813 \u20989 \u25968 \u12290   \u22914 \u26524 \u27809 \u26377 \u20989 \u25968 \u23384 \u22312 ,\u40664 \u35748 \u20026 \
+                    none\uc0\u12290 \u22914 \u26524 \u26377 \u20989 \u25968 \u23384 \u22312 ,\u40664 \u35748 \u20026  auto\u12290   \u26174 \u31034 \u21487 \u33021 \u30340 \u31867 \u22411 \
+                  x-apifox-orders: []\
+              required:\
+                - model\
+                - messages\
+                - tools\
+                - tool_choice\
+              x-apifox-orders:\
+                - model\
+                - messages\
+                - temperature\
+                - top_p\
+                - 'n'\
+                - stream\
+                - stop\
+                - max_tokens\
+                - presence_penalty\
+                - frequency_penalty\
+                - logit_bias\
+                - user\
+                - response_format\
+                - seen\
+                - tools\
+                - tool_choice\
+      responses:\
+        '200':\
+          description: ''\
+          content:\
+            application/json:\
+              schema:\
+                type: object\
+                properties:\
+                  id:\
+                    type: string\
+                  object:\
+                    type: string\
+                  created:\
+                    type: integer\
+                  choices:\
+                    type: array\
+                    items:\
+                      type: object\
+                      properties:\
+                        index:\
+                          type: integer\
+                        message:\
+                          type: object\
+                          properties:\
+                            role:\
+                              type: string\
+                            content:\
+                              type: string\
+                          required:\
+                            - role\
+                            - content\
+                          x-apifox-orders:\
+                            - role\
+                            - content\
+                        finish_reason:\
+                          type: string\
+                      x-apifox-orders:\
+                        - index\
+                        - message\
+                        - finish_reason\
+                  usage:\
+                    type: object\
+                    properties:\
+                      prompt_tokens:\
+                        type: integer\
+                      completion_tokens:\
+                        type: integer\
+                      total_tokens:\
+                        type: integer\
+                    required:\
+                      - prompt_tokens\
+                      - completion_tokens\
+                      - total_tokens\
+                    x-apifox-orders:\
+                      - prompt_tokens\
+                      - completion_tokens\
+                      - total_tokens\
+                required:\
+                  - id\
+                  - object\
+                  - created\
+                  - choices\
+                  - usage\
+                x-apifox-orders:\
+                  - id\
+                  - object\
+                  - created\
+                  - choices\
+                  - usage\
+              example:\
+                id: chatcmpl-123\
+                object: chat.completion\
+                created: 1677652288\
+                choices:\
+                  - index: 0\
+                    message:\
+                      role: assistant\
+                      content: |-\
+\
+\
+                        Hello there, how may I assist you today?\
+                    finish_reason: stop\
+                usage:\
+                  prompt_tokens: 9\
+                  completion_tokens: 12\
+                  total_tokens: 21\
+          headers: \{\}\
+          x-apifox-name: OK\
+      security: []\
+      x-apifox-folder: \uc0\u32842 \u22825 (Chat)\
+      x-apifox-status: released\
+      x-run-in-apifox: https://app.apifox.com/web/project/3868318/apis/api-139393491-run\
+components:\
+  schemas: \{\}\
+  securitySchemes: \{\}\
+servers: []\
+security: []\
+\
+```}
