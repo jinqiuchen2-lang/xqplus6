@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Compress the image
-    let compressedBuffer = buffer;
+    let compressedBuffer: Buffer = buffer;
     let quality = 90;
     let scale = 1;
 
