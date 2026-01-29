@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
     const formData = new FormData();
     formData.append('image', imageBlob);
     formData.append('prompt', finalPrompt);
+    formData.append('model', NANO_BANANA_MODEL); // Specify the model
     formData.append('size', `${dimensions.width}x${dimensions.height}`);
     formData.append('n', '1');
 
