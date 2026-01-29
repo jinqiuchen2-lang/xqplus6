@@ -123,9 +123,9 @@ export async function POST(request: NextRequest) {
     const formData = new FormData();
     formData.append('image', imageBlob);
     formData.append('prompt', finalPrompt);
-    formData.append('model', NANO_BANANA_MODEL); // Specify the model
+    formData.append('model', NANO_BANANA_MODEL);
     formData.append('size', `${dimensions.width}x${dimensions.height}`);
-    formData.append('n', '1');
+    // Don't send 'n' parameter - let API use default (1)
 
     // Use async generations endpoint
     const response = await fetch(`${API_URL}/v1/images/generations?async=true`, {
