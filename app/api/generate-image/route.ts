@@ -4,6 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
 const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
 const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
+const NANO_BANANA_API_KEY = process.env.NANO_BANANA_API_KEY || API_KEY;
 
 export async function POST(request: NextRequest) {
   try {
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${API_URL}/v1/images/edits`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${NANO_BANANA_API_KEY}`,
       },
       body: formData,
     });
