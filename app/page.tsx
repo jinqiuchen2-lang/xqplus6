@@ -363,11 +363,31 @@ export default function Home() {
     }
   };
 
-  const downloadImage = (url: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
+  const downloadImage = async (url: string, filename: string) => {
+    try {
+      // Use our proxy API to download the image (avoids CORS issues)
+      const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+
+      if (!response.ok) {
+        throw new Error('Failed to download image');
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      alert('下载图片失败，请稍后重试');
+    }
   };
 
   const openImageModal = (imageUrl: string) => {
