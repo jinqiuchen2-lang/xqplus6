@@ -214,41 +214,51 @@ export async function POST(request: NextRequest) {
       .replace('{POSTER_NAME}', spec.name)
       .replace('{STYLE}', spec.posterStyle);
 
-    const response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
-              },
-              ...images.map((img: string) => ({
-                type: 'image_url',
-                image_url: { url: img },
-              })),
-            ],
-          },
-        ],
-        max_tokens: 2000,
-      }),
-    });
+    // Add timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout for prompt generation
+
+    let response: Response;
+    try {
+      response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${API_KEY}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: MODEL_NAME,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
+                },
+                ...images.map((img: string) => ({
+                  type: 'image_url',
+                  image_url: { url: img },
+                })),
+              ],
+            },
+          ],
+          max_tokens: 1500, // Reduced from 2000
+        }),
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

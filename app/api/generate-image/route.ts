@@ -47,67 +47,70 @@ export async function POST(request: NextRequest) {
     let finalPrompt = prompt;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // Reduced to 20s timeout
 
-    const analysisResponse = await fetch(`${API_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          {
-            role: 'system',
-            content: `你是一个专业的产品分析师。请仔细分析上传的产品图片，提取关键特征。
+    let analysisSuccess = false;
+    try {
+      const analysisResponse = await fetch(`${API_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${API_KEY}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: MODEL_NAME,
+          messages: [
+            {
+              role: 'system',
+              content: `你是产品分析师。分析产品图片并生成英文增强提示词。
 
-请按以下格式输出：
-
-【产品特征分析】
-- 产品类型：[具体描述]
-- 颜色：[主色调、辅助色]
-- 材质：[面料/材质描述]
-- 款式特点：[设计元素、LOGO位置、图案等]
-- 整体风格：[风格描述]
+【产品特征】
+- 产品类型、颜色、材质、款式特点
 
 【增强提示词】
-[基于用户原始提示词，结合产品特征，生成详细的英文图像生成提示词。提示词必须严格保留产品的所有视觉特征，包括颜色、款式、LOGO、材质等。]`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `请分析这张产品图片，并基于以下用户提示词生成增强版提示词：\n\n${prompt}`
-              },
-              {
-                type: 'image_url',
-                image_url: { url: image }
-              }
-            ]
-          }
-        ],
-        max_tokens: 1500,
-      }),
-    });
+[基于用户提示词和产品特征，生成详细的英文图像生成提示词，保留产品所有视觉特征]`
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `分析产品图片，生成增强版提示词：\n\n${prompt}`
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: image }
+                }
+              ]
+            }
+          ],
+          max_tokens: 800, // Reduced from 1500
+        }),
+      });
+
+      if (analysisResponse.ok) {
+        const analysisData = await analysisResponse.json();
+        const analysisContent = analysisData.choices?.[0]?.message?.content || '';
+        console.log('Product analysis completed');
+
+        // Extract the enhanced prompt from the analysis
+        const enhancedPromptMatch = analysisContent.match(/【增强提示词】\s*([\s\S]*?)(?=\n|$)/);
+        if (enhancedPromptMatch) {
+          finalPrompt = enhancedPromptMatch[1].trim();
+          console.log('Using enhanced prompt with reference image features');
+          analysisSuccess = true;
+        }
+      }
+    } catch (analysisError) {
+      console.log('Vision analysis error:', analysisError);
+      // Continue with original prompt
+    }
 
     clearTimeout(timeoutId);
 
-    if (analysisResponse.ok) {
-      const analysisData = await analysisResponse.json();
-      const analysisContent = analysisData.choices?.[0]?.message?.content || '';
-      console.log('Product analysis completed');
-
-      // Extract the enhanced prompt from the analysis
-      const enhancedPromptMatch = analysisContent.match(/【增强提示词】\s*([\s\S]*?)(?=\n|$)/);
-      if (enhancedPromptMatch) {
-        finalPrompt = enhancedPromptMatch[1].trim();
-        console.log('Using enhanced prompt with reference image features');
-      }
-    } else {
-      console.log('Vision analysis failed, using original prompt');
+    if (!analysisSuccess) {
+      console.log('Vision analysis failed or timed out, using original prompt');
     }
 
     // Step 2: Submit async image generation task

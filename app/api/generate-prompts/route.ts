@@ -205,6 +205,10 @@ export async function POST(request: NextRequest) {
     // Generate prompts for each poster type
     const prompts = await Promise.all(
       PROMPT_SPECS.map(async (spec) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout per prompt
+
+        let response: Response;
         try {
           console.log(`Generating prompt for ${spec.name} (${spec.type})`);
 
@@ -214,7 +218,7 @@ export async function POST(request: NextRequest) {
             .replace('{POSTER_NAME}', spec.name)
             .replace('{STYLE}', spec.posterStyle);
 
-          const response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
+          response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -225,6 +229,7 @@ export async function POST(request: NextRequest) {
               'Accept-Encoding': 'gzip, deflate, br',
               'Connection': 'keep-alive',
             },
+            signal: controller.signal,
             body: JSON.stringify({
               model: MODEL_NAME,
               messages: [
@@ -246,42 +251,45 @@ export async function POST(request: NextRequest) {
                   ]
                 }
               ],
-              max_tokens: 2000,
+              max_tokens: 1500, // Reduced from 2000
             }),
           });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`API Error for ${spec.name}:`, response.status, errorText);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`API Error for ${spec.name}:`, response.status, errorText);
 
-            // Provide more specific error messages
-            let errorMessage = `API request failed: ${response.statusText}`;
-            if (response.status === 401) {
-              errorMessage = 'API密钥无效，请检查配置';
-            } else if (response.status === 403) {
-              errorMessage = 'API访问被拒绝，请检查权限';
-            } else if (response.status === 429) {
-              errorMessage = '请求过于频繁，请稍后再试';
-            } else if (response.status >= 500) {
-              errorMessage = 'API服务暂时不可用，请稍后重试';
-            }
-
-            throw new Error(errorMessage);
+          // Provide more specific error messages
+          let errorMessage = `API request failed: ${response.statusText}`;
+          if (response.status === 401) {
+            errorMessage = 'API密钥无效，请检查配置';
+          } else if (response.status === 403) {
+            errorMessage = 'API访问被拒绝，请检查权限';
+          } else if (response.status === 429) {
+            errorMessage = '请求过于频繁，请稍后再试';
+          } else if (response.status >= 500) {
+            errorMessage = 'API服务暂时不可用，请稍后重试';
           }
 
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
+          throw new Error(errorMessage);
+        }
 
-          // Parse the response to extract components
-          let chinesePrompt = '';
-          let constraint = '';
-          let identificationReport = '';
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
 
-          // Extract identification report
-          const reportMatch = content.match(/【识别报告】([\s\S]*?)【视觉约束立法】/);
-          if (reportMatch) {
-            identificationReport = reportMatch[1].trim();
+        // Parse the response to extract components
+        let chinesePrompt = '';
+        let constraint = '';
+        let identificationReport = '';
+
+        // Extract identification report
+        const reportMatch = content.match(/【识别报告】([\s\S]*?)【视觉约束立法】/);
+        if (reportMatch) {
+          identificationReport = reportMatch[1].trim();
           }
 
           // Extract constraint section
