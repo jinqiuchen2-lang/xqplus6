@@ -59,6 +59,9 @@ export default function Home() {
   const [selectedQuality, setSelectedQuality] = useState('2K');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
+  // Async task state
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [taskStatus, setTaskStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
 
   // Module 3: History State - Load from localStorage on mount
   const [history, setHistory] = useState<GeneratedImage[]>([]);
@@ -313,9 +316,10 @@ export default function Home() {
 
     setIsGeneratingImage(true);
     setCurrentGeneratedImage(null);
+    setTaskStatus('processing');
 
     try {
-      // Use the first uploaded image as base
+      // Submit async generation task
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -327,27 +331,76 @@ export default function Home() {
         }),
       });
 
-      if (!response.ok) throw new Error('生成图片失败');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '提交生成任务失败');
+      }
 
       const data = await response.json();
-      setCurrentGeneratedImage(data.imageUrl);
 
-      // Add to history
-      const newHistoryItem: GeneratedImage = {
-        id: Date.now().toString(),
-        url: data.imageUrl,
-        prompt: currentEditedPrompt,
-        date: new Date().toLocaleString('zh-CN'),
-        posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
-      };
-      setHistory([newHistoryItem, ...history]);
+      if (!data.taskId) {
+        throw new Error('未收到任务ID');
+      }
+
+      setCurrentTaskId(data.taskId);
     } catch (error) {
-      console.error('Error generating image:', error);
-      alert('生成图片失败，请重试');
-    } finally {
+      console.error('Error submitting image generation task:', error);
+      alert(`提交生成任务失败：${error instanceof Error ? error.message : '未知错误'}`);
       setIsGeneratingImage(false);
+      setTaskStatus('idle');
+      setCurrentTaskId(null);
     }
   };
+
+  // Poll for task completion
+  useEffect(() => {
+    if (!currentTaskId || taskStatus !== 'processing') {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/check-task-status/${currentTaskId}`);
+
+        if (!response.ok) {
+          throw new Error('查询任务状态失败');
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'completed' && data.imageUrl) {
+          // Task completed successfully
+          setCurrentGeneratedImage(data.imageUrl);
+          setTaskStatus('completed');
+          setIsGeneratingImage(false);
+          setCurrentTaskId(null);
+
+          // Add to history
+          const newHistoryItem: GeneratedImage = {
+            id: Date.now().toString(),
+            url: data.imageUrl,
+            prompt: currentEditedPrompt,
+            date: new Date().toLocaleString('zh-CN'),
+            posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
+          };
+          setHistory([newHistoryItem, ...history]);
+        } else if (data.status === 'failed') {
+          // Task failed
+          setTaskStatus('failed');
+          setIsGeneratingImage(false);
+          setCurrentTaskId(null);
+          alert(`生成图片失败：${data.error || '未知错误'}`);
+        }
+        // If status is 'processing', continue polling
+      } catch (error) {
+        console.error('Error polling task status:', error);
+        // Don't alert on polling errors, just log them
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup interval on unmount or when task completes
+    return () => clearInterval(pollInterval);
+  }, [currentTaskId, taskStatus, currentEditedPrompt, activeTab, history]);
 
   const downloadImage = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -641,7 +694,10 @@ export default function Home() {
               {isGeneratingImage ? (
                 <div className="loading">
                   <span className="spinner" style={{ width: 32, height: 32 }} />
-                  <span>正在生成海报...</span>
+                  <span>正在生成图片，请稍候...</span>
+                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                    （完整的视觉分析需要30秒左右，请耐心等待）
+                  </p>
                 </div>
               ) : currentGeneratedImage ? (
                 <img
@@ -650,6 +706,10 @@ export default function Home() {
                   style={{ maxHeight: '450px', cursor: 'pointer' }}
                   onClick={() => openImageModal(currentGeneratedImage!)}
                 />
+              ) : taskStatus === 'failed' ? (
+                <div className="placeholder">
+                  <p style={{ color: '#ef4444' }}>生成失败，请重试</p>
+                </div>
               ) : (
                 <div className="placeholder">
                   <p>生成的海报将显示在这里</p>

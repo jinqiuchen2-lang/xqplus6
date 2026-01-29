@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Map ratio to dimensions (assuming base size of 1024)
+    // Map ratio to dimensions
     const ratioMap: Record<string, { width: number; height: number }> = {
       '1:1': { width: 1024, height: 1024 },
       '2:3': { width: 683, height: 1024 },
@@ -38,30 +38,30 @@ export async function POST(request: NextRequest) {
 
     const dimensions = ratioMap[ratio] || ratioMap['1:1'];
 
-    console.log('=== Starting image generation with reference ===');
+    console.log('=== Starting async image generation ===');
     console.log('Model:', NANO_BANANA_MODEL);
     console.log('Dimensions:', dimensions);
 
-    // Step 1: Use vision model to analyze the reference image and enhance the prompt
-    console.log('Step 1: Analyzing reference image with vision model...');
-
+    // Step 1: Full vision analysis for product fidelity
+    console.log('Step 1: Complete product analysis...');
     let finalPrompt = prompt;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
     const analysisResponse = await fetch(`${API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: MODEL_NAME,
         messages: [
           {
             role: 'system',
-            content: `你是一个专业的产品分析师。请仔细分析上传的产品图片，提取关键特征，然后生成一个增强版的图像生成提示词。
+            content: `你是一个专业的产品分析师。请仔细分析上传的产品图片，提取关键特征。
 
 请按以下格式输出：
 
@@ -69,11 +69,11 @@ export async function POST(request: NextRequest) {
 - 产品类型：[具体描述]
 - 颜色：[主色调、辅助色]
 - 材质：[面料/材质描述]
-- 款式特点：[设计元素、LOGO位置等]
+- 款式特点：[设计元素、LOGO位置、图案等]
 - 整体风格：[风格描述]
 
 【增强提示词】
-[基于用户原始提示词，结合产品特征，生成详细的英文图像生成提示词。提示词必须严格保留产品的所有视觉特征，包括颜色、款式、LOGO、材质等。确保生成的图片与参考产品高度一致。]`
+[基于用户原始提示词，结合产品特征，生成详细的英文图像生成提示词。提示词必须严格保留产品的所有视觉特征，包括颜色、款式、LOGO、材质等。]`
           },
           {
             role: 'user',
@@ -93,23 +93,25 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!analysisResponse.ok) {
-      console.error('Vision analysis failed, using original prompt');
-    } else {
+    clearTimeout(timeoutId);
+
+    if (analysisResponse.ok) {
       const analysisData = await analysisResponse.json();
       const analysisContent = analysisData.choices?.[0]?.message?.content || '';
       console.log('Product analysis completed');
 
       // Extract the enhanced prompt from the analysis
-      const enhancedPromptMatch = analysisContent.match(/【增强提示词】\s*([\s\S]*?)(?=$|$)/);
+      const enhancedPromptMatch = analysisContent.match(/【增强提示词】\s*([\s\S]*?)(?=\n|$)/);
       if (enhancedPromptMatch) {
         finalPrompt = enhancedPromptMatch[1].trim();
         console.log('Using enhanced prompt with reference image features');
       }
+    } else {
+      console.log('Vision analysis failed, using original prompt');
     }
 
-    // Step 2: Generate image with reference image using edits endpoint
-    console.log('Step 2: Generating image with reference...');
+    // Step 2: Submit async image generation task
+    console.log('Step 2: Submitting async generation task...');
 
     // Convert base64 to blob
     const imageBlob = await fetch(image).then(r => r.blob());
@@ -121,8 +123,8 @@ export async function POST(request: NextRequest) {
     formData.append('size', `${dimensions.width}x${dimensions.height}`);
     formData.append('n', '1');
 
-    // Use edits endpoint with reference image (required, no fallback)
-    const response = await fetch(`${API_URL}/v1/images/edits`, {
+    // Use async generations endpoint
+    const response = await fetch(`${API_URL}/v1/images/generations?async=true`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
@@ -133,30 +135,30 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Edits API Error Status:', response.status);
-      console.error('Edits API Error Response:', errorText);
-      throw new Error(`图片生成失败（必须参考原图）: ${response.status} ${response.statusText}`);
+      console.error('Async API Error Status:', response.status);
+      console.error('Async API Error Response:', errorText);
+      throw new Error(`提交生成任务失败: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('Image generated successfully with reference image (edits endpoint)');
+    console.log('Task submitted successfully');
 
-    // Extract the generated image URL
-    const imageUrl = data.data?.[0]?.url || data.url;
+    // Extract task_id
+    const taskId = data.data || data.task_id;
 
-    if (!imageUrl) {
-      throw new Error('No image URL in response');
+    if (!taskId) {
+      console.error('Response data:', data);
+      throw new Error('No task_id in response');
     }
 
-    console.log('Image generated successfully with reference');
+    console.log('Task ID:', taskId);
 
     return NextResponse.json({
       success: true,
-      imageUrl,
-      prompt: finalPrompt,
-      ratio,
-      quality
+      taskId,
+      message: '图片生成任务已提交，正在处理中...'
     });
+
   } catch (error) {
     console.error('Error in generate-image API:', error);
     return NextResponse.json(
