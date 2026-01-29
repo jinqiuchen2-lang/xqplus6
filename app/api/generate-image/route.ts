@@ -27,24 +27,10 @@ export async function POST(request: NextRequest) {
     // Combine constraint with prompt if provided
     const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
 
-    // Map ratio to dimensions
-    const ratioMap: Record<string, { width: number; height: number }> = {
-      '1:1': { width: 1024, height: 1024 },
-      '2:3': { width: 683, height: 1024 },
-      '3:2': { width: 1024, height: 683 },
-      '3:4': { width: 768, height: 1024 },
-      '4:3': { width: 1024, height: 768 },
-      '4:5': { width: 820, height: 1024 },
-      '5:4': { width: 1024, height: 820 },
-      '9:16': { width: 576, height: 1024 },
-      '16:9': { width: 1024, height: 576 },
-    };
-
-    const dimensions = ratioMap[ratio] || ratioMap['1:1'];
-
     console.log('=== Starting async image generation ===');
     console.log('Model:', NANO_BANANA_MODEL);
-    console.log('Dimensions:', dimensions);
+    console.log('Aspect Ratio:', ratio);
+    console.log('Quality:', quality);
 
     // Step 1: Full vision analysis for product fidelity
     console.log('Step 1: Complete product analysis...');
@@ -134,17 +120,31 @@ export async function POST(request: NextRequest) {
     console.log('Step 2: Generating image with reference...');
     console.log('Final prompt being used:', finalPrompt.substring(0, 200) + '...');
     console.log('Image reference included:', !!image);
-    console.log('Size:', `${dimensions.width}x${dimensions.height}`);
+    console.log('Model:', NANO_BANANA_MODEL);
+    console.log('Aspect Ratio:', ratio);
+    console.log('Image Size:', quality);
 
     // Convert base64 to blob for FormData
     const imageBlob = await fetch(image).then(r => r.blob());
 
-    // Use FormData for image upload (edits endpoint requires multipart)
+    // Use FormData according to API spec
+    // Required: model, prompt, image
+    // Optional: aspect_ratio, image_size, response_format
     const formData = new FormData();
-    formData.append('image', imageBlob);
+    formData.append('model', NANO_BANANA_MODEL);
     formData.append('prompt', finalPrompt);
-    formData.append('size', `${dimensions.width}x${dimensions.height}`);
-    formData.append('n', '1');
+    formData.append('image', imageBlob);
+    formData.append('aspect_ratio', ratio);
+    formData.append('image_size', quality);
+    formData.append('response_format', 'url');
+
+    console.log('FormData prepared:', {
+      model: NANO_BANANA_MODEL,
+      prompt: finalPrompt.substring(0, 100) + '...',
+      aspect_ratio: ratio,
+      image_size: quality,
+      response_format: 'url'
+    });
 
     const response = await fetch(`${API_URL}/v1/images/edits`, {
       method: 'POST',
