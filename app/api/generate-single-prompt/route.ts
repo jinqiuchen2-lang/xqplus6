@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const API_KEY = process.env.API_KEY;
+const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
 const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
 
 // Prompt specifications for the 7 poster types
@@ -174,6 +174,9 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2)
 
 export async function POST(request: NextRequest) {
   console.log('=== generate-single-prompt API called ===');
+  console.log('API_URL:', API_URL);
+  console.log('MODEL_NAME:', MODEL_NAME);
+  console.log('API_KEY exists:', !!API_KEY);
   try {
     const body = await request.json();
     console.log('Request body keys:', Object.keys(body));
@@ -216,9 +219,14 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
       },
       body: JSON.stringify({
-        model: GEMINI_MODEL,
+        model: MODEL_NAME,
         messages: [
           {
             role: 'system',
