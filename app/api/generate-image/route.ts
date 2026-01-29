@@ -116,25 +116,20 @@ export async function POST(request: NextRequest) {
     // Step 2: Submit async image generation task
     console.log('Step 2: Submitting async generation task...');
 
-    // Convert base64 to blob
-    const imageBlob = await fetch(image).then(r => r.blob());
-
-    // Create FormData with reference image
-    const formData = new FormData();
-    formData.append('image', imageBlob);
-    formData.append('prompt', finalPrompt);
-    formData.append('model', NANO_BANANA_MODEL);
-    formData.append('size', `${dimensions.width}x${dimensions.height}`);
-    // Don't send 'n' parameter - let API use default (1)
-
-    // Use async generations endpoint
+    // Use JSON format with base64 image to avoid FormData type issues
     const response = await fetch(`${API_URL}/v1/images/generations?async=true`, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      body: formData,
+      body: JSON.stringify({
+        model: NANO_BANANA_MODEL,
+        prompt: finalPrompt,
+        image: image, // Send as base64 data URL
+        size: `${dimensions.width}x${dimensions.height}`,
+        n: 1, // This is now a number in JSON
+      }),
     });
 
     if (!response.ok) {
