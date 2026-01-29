@@ -113,49 +113,61 @@ export async function POST(request: NextRequest) {
       console.log('Vision analysis failed or timed out, using original prompt');
     }
 
-    // Step 2: Submit async image generation task
-    console.log('Step 2: Submitting async generation task...');
+    // Step 2: Generate image using edits endpoint (image-to-image)
+    console.log('Step 2: Generating image with reference...');
 
-    // Use JSON format with base64 image to avoid FormData type issues
-    const response = await fetch(`${API_URL}/v1/images/generations?async=true`, {
+    // Convert base64 to blob for FormData
+    const imageBlob = await fetch(image).then(r => r.blob());
+
+    // Use FormData for image upload (edits endpoint requires multipart)
+    const formData = new FormData();
+    formData.append('image', imageBlob);
+    formData.append('prompt', finalPrompt);
+    formData.append('size', `${dimensions.width}x${dimensions.height}`);
+    formData.append('n', '1');
+
+    const response = await fetch(`${API_URL}/v1/images/edits`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
       },
-      body: JSON.stringify({
-        model: NANO_BANANA_MODEL,
-        prompt: finalPrompt,
-        image: image, // Send as base64 data URL
-        size: `${dimensions.width}x${dimensions.height}`,
-        n: 1, // This is now a number in JSON
-      }),
+      body: formData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Async API Error Status:', response.status);
-      console.error('Async API Error Response:', errorText);
-      throw new Error(`提交生成任务失败: ${response.status} ${response.statusText}`);
+      console.error('Image Generation Error Status:', response.status);
+      console.error('Image Generation Error Response:', errorText);
+
+      // Provide more helpful error messages
+      if (response.status === 404) {
+        throw new Error('图片生成端点不可用，请检查API配置');
+      } else if (response.status === 401) {
+        throw new Error('API密钥无效');
+      } else if (response.status >= 500) {
+        throw new Error('API服务暂时不可用，请稍后重试');
+      }
+      throw new Error(`生成图片失败: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('Task submitted successfully');
+    console.log('Image generated successfully');
 
-    // Extract task_id
-    const taskId = data.data || data.task_id;
+    // Extract image URL from response
+    const imageUrl = data.data?.[0]?.url || data.url;
 
-    if (!taskId) {
+    if (!imageUrl) {
       console.error('Response data:', data);
-      throw new Error('No task_id in response');
+      throw new Error('No image URL in response');
     }
 
-    console.log('Task ID:', taskId);
+    console.log('Image URL:', imageUrl);
 
+    // Return the image directly instead of taskId
     return NextResponse.json({
       success: true,
-      taskId,
-      message: '图片生成任务已提交，正在处理中...'
+      imageUrl,
+      message: '图片生成成功'
     });
 
   } catch (error) {
