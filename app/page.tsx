@@ -314,6 +314,10 @@ export default function Home() {
     setIsGeneratingImage(true);
     setCurrentGeneratedImage(null);
 
+    // Get the constraint for current tab
+    const currentPrompt = prompts[activeTab];
+    const constraint = currentPrompt?.constraint || '';
+
     try {
       // Generate image
       const response = await fetch('/api/generate-image', {
@@ -322,6 +326,7 @@ export default function Home() {
         body: JSON.stringify({
           image: uploadedImages[0].dataUrl,
           prompt: currentEditedPrompt,
+          constraint: constraint, // Send constraint to backend
           ratio: selectedRatio,
           quality: selectedQuality,
         }),

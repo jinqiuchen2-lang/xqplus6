@@ -7,7 +7,7 @@ const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt, ratio = '1:1', quality = '2K' } = await request.json();
+    const { image, prompt, ratio = '1:1', quality = '2K', constraint } = await request.json();
 
     if (!image) {
       return NextResponse.json(
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Combine constraint with prompt if provided
+    const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
 
     // Map ratio to dimensions
     const ratioMap: Record<string, { width: number; height: number }> = {
@@ -44,10 +47,11 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Full vision analysis for product fidelity
     console.log('Step 1: Complete product analysis...');
-    let finalPrompt = prompt;
+    console.log('Input prompt with constraint:', fullPrompt.substring(0, 300) + '...');
+    let finalPrompt = fullPrompt;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // Reduced to 20s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s timeout for complete analysis
 
     let analysisSuccess = false;
     try {
@@ -63,20 +67,26 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'system',
-              content: `你是产品分析师。分析产品图片并生成英文增强提示词。
+              content: `你是一个专业的产品分析师。请仔细分析上传的产品图片，提取关键特征。
 
-【产品特征】
-- 产品类型、颜色、材质、款式特点
+请按以下格式输出：
 
-【增强提示词】
-[基于用户提示词和产品特征，生成详细的英文图像生成提示词，保留产品所有视觉特征]`
+【产品特征分析】
+- 产品类型：[具体描述]
+- 颜色：[主色调、辅助色]
+- 材质：[面料/材质描述]
+- 款式特点：[设计元素、LOGO位置、图案等]
+- 整体风格：[风格描述]
+
+【英文增强提示词】
+[基于用户的提示词（包含约束条件和中文描述），结合产品特征，生成详细的英文图像生成提示词。提示词必须严格保留产品的所有视觉特征，包括颜色、款式、LOGO、材质等。必须遵守所有约束条件。]`
             },
             {
               role: 'user',
               content: [
                 {
                   type: 'text',
-                  text: `分析产品图片，生成增强版提示词：\n\n${prompt}`
+                  text: `请分析这张产品图片，并基于以下用户提示词生成英文增强版提示词（直接输出英文提示词，不要包含其他内容）：\n\n${fullPrompt}`
                 },
                 {
                   type: 'image_url',
@@ -85,7 +95,7 @@ export async function POST(request: NextRequest) {
               ]
             }
           ],
-          max_tokens: 800, // Reduced from 1500
+          max_tokens: 1500, // Full analysis
         }),
       });
 
@@ -93,13 +103,19 @@ export async function POST(request: NextRequest) {
         const analysisData = await analysisResponse.json();
         const analysisContent = analysisData.choices?.[0]?.message?.content || '';
         console.log('Product analysis completed');
+        console.log('Analysis content:', analysisContent);
 
         // Extract the enhanced prompt from the analysis
-        const enhancedPromptMatch = analysisContent.match(/【增强提示词】\s*([\s\S]*?)(?=\n|$)/);
+        // Match everything after 【英文增强提示词】 until the end
+        const enhancedPromptMatch = analysisContent.match(/【英文增强提示词】\s*([\s\S]*)/);
         if (enhancedPromptMatch) {
           finalPrompt = enhancedPromptMatch[1].trim();
           console.log('Using enhanced prompt with reference image features');
+          console.log('Enhanced prompt length:', finalPrompt.length);
+          console.log('Enhanced prompt preview:', finalPrompt.substring(0, 200));
           analysisSuccess = true;
+        } else {
+          console.log('Could not extract enhanced prompt, using original full prompt');
         }
       }
     } catch (analysisError) {
@@ -115,6 +131,9 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Generate image using edits endpoint (image-to-image)
     console.log('Step 2: Generating image with reference...');
+    console.log('Final prompt being used:', finalPrompt.substring(0, 200) + '...');
+    console.log('Image reference included:', !!image);
+    console.log('Size:', `${dimensions.width}x${dimensions.height}`);
 
     // Convert base64 to blob for FormData
     const imageBlob = await fetch(image).then(r => r.blob());

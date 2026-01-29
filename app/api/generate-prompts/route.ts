@@ -254,11 +254,8 @@ export async function POST(request: NextRequest) {
               max_tokens: 1500, // Reduced from 2000
             }),
           });
-        } finally {
-          clearTimeout(timeoutId);
-        }
 
-        if (!response.ok) {
+          if (!response.ok) {
           const errorText = await response.text();
           console.error(`API Error for ${spec.name}:`, response.status, errorText);
 
@@ -274,6 +271,7 @@ export async function POST(request: NextRequest) {
             errorMessage = 'API服务暂时不可用，请稍后重试';
           }
 
+          clearTimeout(timeoutId);
           throw new Error(errorMessage);
         }
 
@@ -290,42 +288,44 @@ export async function POST(request: NextRequest) {
         const reportMatch = content.match(/【识别报告】([\s\S]*?)【视觉约束立法】/);
         if (reportMatch) {
           identificationReport = reportMatch[1].trim();
+        }
+
+        // Extract constraint section
+        const constraintMatch = content.match(/\[CRITICAL CONSTRAINT: PRODUCT FIDELITY\]([\s\S]*?)\[END CONSTRAINT\]/);
+        if (constraintMatch) {
+          constraint = constraintMatch[1].trim();
+        } else {
+          // Fallback: try to find constraint in old format
+          const oldConstraintMatch = content.match(/CRITICAL CONSTRAINT[：:]\s*([\s\S]*?)(?=$|中文提示词|负面词)/);
+          if (oldConstraintMatch) {
+            constraint = oldConstraintMatch[1].trim();
           }
+        }
 
-          // Extract constraint section
-          const constraintMatch = content.match(/\[CRITICAL CONSTRAINT: PRODUCT FIDELITY\]([\s\S]*?)\[END CONSTRAINT\]/);
-          if (constraintMatch) {
-            constraint = constraintMatch[1].trim();
-          } else {
-            // Fallback: try to find constraint in old format
-            const oldConstraintMatch = content.match(/CRITICAL CONSTRAINT[：:]\s*([\s\S]*?)(?=$|中文提示词|负面词)/);
-            if (oldConstraintMatch) {
-              constraint = oldConstraintMatch[1].trim();
-            }
-          }
+        // Extract Chinese prompt
+        const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=负面词|Negative|$)/);
+        if (chineseMatch) {
+          chinesePrompt = chineseMatch[1].trim();
+        }
 
-          // Extract Chinese prompt
-          const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=负面词|Negative|$)/);
-          if (chineseMatch) {
-            chinesePrompt = chineseMatch[1].trim();
-          }
+        // If still empty, use the whole content as prompt
+        if (!chinesePrompt) {
+          chinesePrompt = content;
+        }
 
-          // If still empty, use the whole content as prompt
-          if (!chinesePrompt) {
-            chinesePrompt = content;
-          }
+        console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length);
 
-          console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length);
+        clearTimeout(timeoutId);
 
-          return {
-            type: spec.type,
-            name: spec.name,
-            chinesePrompt: chinesePrompt,
-            constraint: constraint,
-            identificationReport: identificationReport,
-            fullPrompt: content
-          };
-        } catch (error) {
+        return {
+          type: spec.type,
+          name: spec.name,
+          chinesePrompt: chinesePrompt,
+          constraint: constraint,
+          identificationReport: identificationReport,
+          fullPrompt: content
+        };
+      } catch (error) {
           console.error(`Error generating prompt for ${spec.name}:`, error);
 
           // Handle Response objects from failed retries
@@ -335,6 +335,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Return a default prompt on error
+          clearTimeout(timeoutId);
           return {
             type: spec.type,
             name: spec.name,
