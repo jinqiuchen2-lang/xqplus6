@@ -59,6 +59,7 @@ export default function Home() {
   const [selectedQuality, setSelectedQuality] = useState('2K');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
+  const [hasTriedGenerating, setHasTriedGenerating] = useState(false);
 
   // Module 3: History State - Load from localStorage on mount
   const [history, setHistory] = useState<GeneratedImage[]>([]);
@@ -242,6 +243,7 @@ export default function Home() {
 
       setPrompts(promptsMap);
       setEditedPrompts(editedPromptsMap);
+      setHasTriedGenerating(true);
 
       // 自动切换到第一个有提示词的Tab
       if (data.prompts.length > 0) {
@@ -284,6 +286,7 @@ export default function Home() {
       const newPrompt: PromptData = data.prompt;
       setPrompts({ ...prompts, [activeTab]: newPrompt });
       setEditedPrompts({ ...editedPrompts, [activeTab]: newPrompt.chinesePrompt });
+      setHasTriedGenerating(true);
     } catch (error) {
       console.error('Error generating single prompt:', error);
       alert(`生成提示词失败：${error instanceof Error ? error.message : '未知错误'}`);
@@ -610,12 +613,14 @@ export default function Home() {
                   value={currentEditedPrompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
                   placeholder={
-                    !currentEditedPrompt || currentEditedPrompt.trim().length === 0
-                      ? "提示词生成失败或为空，请重新生成"
-                      : "点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入..."
+                    !hasTriedGenerating
+                      ? "请点击自动生成全部提示词或者自动生成单个提示词"
+                      : (!currentEditedPrompt || currentEditedPrompt.trim().length === 0
+                        ? "提示词生成失败或为空，请重新生成"
+                        : "点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入...")
                   }
                   style={
-                    !currentEditedPrompt || currentEditedPrompt.trim().length === 0
+                    hasTriedGenerating && (!currentEditedPrompt || currentEditedPrompt.trim().length === 0)
                       ? { borderColor: '#ef4444', backgroundColor: '#fef2f2' }
                       : undefined
                   }
