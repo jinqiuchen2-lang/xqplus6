@@ -135,11 +135,22 @@ Step 4: Generate Complete Prompt (System Refined)
 
 负面词 / Negative: [负面提示词]
 
-排版布局（工艺概念可视化/配色灵感类型必填）：
+排版布局：
+- 对于"主KV视觉"、"使用场景"、"细节特写"、"质感特写"、"功能细节"类型，排版布局为可选项（AI根据画面需要决定是否添加）
+- 对于"工艺概念可视化"和"配色灵感"类型，排版布局为必填项，必须按照以下格式输出：
+
+排版布局示例：
 顶部居中：
-主标题：[主标题文字] (字体样式，颜色)
-中间区域：[产品主体描述]
-底部：[副标题/卖点文字] (字体样式，颜色)
+主标题：[产品名称或宣传语] (字体样式，颜色，字号)
+中部区域：[产品主体展示位置说明]
+底部居中：
+副标题：[核心卖点或品牌标语] (字体样式，颜色)
+标签/卖点：[具体卖点文字1] [具体卖点文字2] (位置说明)
+
+注意事项：
+- 排版布局必须详细描述每个文字元素的位置、字体、颜色、大小
+- 标题和副标题要有明确的层次关系
+- 所有文字元素必须与产品风格保持一致
 `;
 
 // Helper function to fetch with retry
@@ -314,7 +325,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract layout section (排版布局)
-    const layoutMatch = content.match(/排版布局[（(].*?[）)]\s*([\s\S]*?)(?=$)/);
+    // Match both with and without parentheses: "排版布局（xxx）" or "排版布局："
+    const layoutMatch = content.match(/排版布局[（:(].*?[）:]\s*([\s\S]*?)(?=$|###|$)/);
     if (layoutMatch) {
       layout = layoutMatch[1].trim();
     }

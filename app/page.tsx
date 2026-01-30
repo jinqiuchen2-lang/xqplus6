@@ -571,7 +571,7 @@ export default function Home() {
                 {/* Label with button on the right */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <label className="control-label" style={{ marginBottom: 0 }}>提示词（可编辑）</label>
-                  {/* 单独生成提示词按钮 - 放在label右侧 */}
+                  {/* 自动生成单个提示词按钮 - 放在label右侧 */}
                   <button
                     className="btn btn-secondary"
                     onClick={generateSinglePrompt}
@@ -601,7 +601,7 @@ export default function Home() {
                         <span className="spinner" style={{ width: 10, height: 10 }} />
                       </span>
                     ) : (
-                      '单独生成提示词'
+                      '自动生成单个提示词'
                     )}
                   </button>
                 </div>
@@ -609,7 +609,7 @@ export default function Home() {
                   className="prompt-textarea"
                   value={currentEditedPrompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
-                  placeholder="点击'自动生成全部提示词'或'单独生成提示词'按钮生成提示词，或手动输入..."
+                  placeholder="点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入..."
                 />
                 {currentPrompt?.constraint && (
                   <div className="constraint-box">

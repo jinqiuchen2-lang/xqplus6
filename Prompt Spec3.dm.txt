@@ -1,0 +1,103 @@
+工艺概念可视化Task Description:
+我需要为我的儿童服饰生成一套完整的电商KV视觉系统提示词
+【核心目标】：
+对产品实物进行工程级还原，严禁AI幻觉。
+
+---
+
+Step 1: Product Information & Visual Constraint Extraction
+请仔细分析我上传的多张产品图片，自动提取以下信息：
+
+1. 自动识别项目 (Basic Info):
+- 产品类型: 识别具体品类（如：针织爬服/羽绒外套/纯棉内衣）。
+- 卖点提取: 视觉特征与功能卖点。
+- 配色方案: 主色调、辅助色、点缀色，配色风格。
+- 设计风格: 识别图案、款式风格。
+- 目标受众: 推断年龄段（如：0-6个月，1-3岁）。
+  
+2. 视觉约束立法提取 (Visual Constraint Extraction) [CRITICAL]:
+请像工业工程师一样提取“不可变特征”：
+- 几何结构锁定: 描述产品绝对轮廓。
+- 材质物理属性: 精准描述材质的光学反应（如：带绒毛的羊毛、哑光纯棉）。
+- 固定组件: 必须保留的扣子、标签、印花位置。
+
+Output Format for Step 1:
+【识别报告】
+产品类型：[大类] - [具体产品]
+产品规格：[具体规格]
+核心卖点：[卖点1 - 中文]...
+主色调：[颜色名称] (#HEX) ...
+设计风格：[风格描述]
+【视觉约束立法 / Visual Constraints】 (Internal Logic):
+- 结构特征：[详细描述]
+- 材质特征：[详细描述]
+- 固定组件：[详细描述]
+
+---
+
+Step 2: Visual Style Selection
+基于产品信息推荐视觉风格（如：水彩艺术、极简北欧、自然有机、可爱色彩、日系淡彩等）。
+AI推荐依据：根据产品类型自动匹配最佳风格，根据产品/包装设计风格延续品牌调性，根据目标受众审美偏好推荐，所有图片大致风格统一。
+
+---
+
+Step 2.5: Photography & Lighting Strategy [NEW - 核心升级]
+请根据海报类型，自动匹配摄影方案（如：北欧自然柔光 (Nordic Soft)‘,梦幻逆光质感 (Dreamy Backlight) ,微距触感光影 (Macro Tactile)… 
+
+---
+
+Step 3: Typography Selection
+推荐适合的文字排版风格和文字风格（如：杂志风、卡通风、可爱疯、极简风）。
+
+---
+
+Step 4: Generate Complete Prompt (System Refined)
+请严格按照以下逻辑生成海报的提示词：
+
+1. Prompt 核心结构 (The Logic):
+在生成具体的海报提示词之前，你必须基于【Step 1】中提取的“视觉约束立法”，编写一段 [CRITICAL CONSTRAINT] 英文代码块。
+这段代码块必须作为每一张海报提示词的“第一段”，置于所有描述之前。
+代码块内容必须包含：
+- Strictly restore reference image (严格还原参考图)
+- DO NOT alter structure (禁止改变结构，引用Step 1提取的结构特征)
+- Material accuracy (材质精准度，引用Step 1提取的材质特征)
+- No Hallucinations (禁止幻觉，禁止随意添加装饰)
+
+2. 输出列表 (Output List):
+- 海报03 - 工艺概念可视化（Process/Concept，必须严格还原产品图）
+
+3. 详细排版与内容要求:
+- 产品图还原要求: 必须在Prompt中明确说明："严格还原上传的产品图，包括设计、LOGO位置、文字内容、图案元素等所有细节"。
+- 每张海报必须包含的元素:
+  - [CRITICAL CONSTRAINT BLOCK] (必须放在Prompt的最开头)
+  - 中文提示词（完整详细，600-1000字）
+  - 详细排版布局说明（位置、字号、颜色、字体、排版格式）
+
+---
+
+Output Format Example (输出示例)
+
+【识别报告】...
+【视觉约束立法】...
+
+### 海报01｜主KV · 云感科技（Hero Shot）
+
+Prompt (English):
+[CRITICAL CONSTRAINT: PRODUCT FIDELITY] 
+1. STRUCTURE: Must be a hoodless, stand-up collar down jacket. Raglan sleeves with two-tone pink splicing (darker pink on sleeves, lighter on body). Vertical zipper pocket on the left chest. 
+2. LOGO: Circular bear-head logo next to the chest pocket. 
+3. MATERIAL: Matte polyamide fabric, soft horizontal quilting with visible loftiness. 
+[END CONSTRAINT] 
+
+提示词：影棚级商业摄影。羽绒服呈动态浮空状，周围环绕着轻盈的羽绒和微小的晶莹冰晶。采用柔和的体积光，体现面料的次表面散射效果，视觉上极度软糯蓬松。哈苏相机拍摄，80mm镜头。纯净极简背景，展现品牌高端调性。
+负面词 / Negative: low-loft, shiny plastic, distorted sleeves, sharp shadows, busy background, distorted logo.
+排版布局：
+顶部居中：
+品牌Logo：cucutas
+主标题：“云朵般轻盈” (圆润粗体，粉色) / “LIGHT AS A CLOUD” (手写体，灰色)。
+中间区域：产品主体（羽绒服）。
+底部左侧：
+副标题：“宝宝的暖冬守护”  (圆润常规体，灰粉色)
+卖点标签（胶囊形）：[羽毛图标] 85%白鸭绒 | A类婴幼儿标准（ 黑体，灰色）
+
+---
