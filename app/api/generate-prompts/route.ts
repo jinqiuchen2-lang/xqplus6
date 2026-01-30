@@ -283,6 +283,7 @@ export async function POST(request: NextRequest) {
         let chinesePrompt = '';
         let constraint = '';
         let identificationReport = '';
+        let layout = '';
 
         // Extract identification report
         const reportMatch = content.match(/【识别报告】([\s\S]*?)【视觉约束立法】/);
@@ -302,10 +303,16 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Extract Chinese prompt
-        const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=负面词|Negative|$)/);
+        // Extract Chinese prompt (before 负面词)
+        const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=负面词|Negative|排版布局|$)/);
         if (chineseMatch) {
           chinesePrompt = chineseMatch[1].trim();
+        }
+
+        // Extract layout section (排版布局)
+        const layoutMatch = content.match(/排版布局[（(].*?[）)]\s*([\s\S]*?)(?=$)/);
+        if (layoutMatch) {
+          layout = layoutMatch[1].trim();
         }
 
         // If still empty, use the whole content as prompt
@@ -313,7 +320,12 @@ export async function POST(request: NextRequest) {
           chinesePrompt = content;
         }
 
-        console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length);
+        // Append layout to chinesePrompt if it exists
+        if (layout) {
+          chinesePrompt = chinesePrompt + '\n\n【排版布局】\n' + layout;
+        }
+
+        console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length, 'Has layout:', !!layout);
 
         clearTimeout(timeoutId);
 
@@ -323,6 +335,7 @@ export async function POST(request: NextRequest) {
           chinesePrompt: chinesePrompt,
           constraint: constraint,
           identificationReport: identificationReport,
+          layout: layout,
           fullPrompt: content
         };
       } catch (error) {
@@ -342,6 +355,7 @@ export async function POST(request: NextRequest) {
             chinesePrompt: `请生成${spec.name}风格的海报，展示产品特点和视觉效果。要求构图合理，光影协调，色彩和谐。`,
             constraint: '必须保留产品原有特征和设计风格',
             identificationReport: '',
+            layout: '',
             fullPrompt: ''
           };
         }
