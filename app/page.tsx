@@ -609,7 +609,16 @@ export default function Home() {
                   className="prompt-textarea"
                   value={currentEditedPrompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
-                  placeholder="点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入..."
+                  placeholder={
+                    !currentEditedPrompt || currentEditedPrompt.trim().length === 0
+                      ? "提示词生成失败或为空，请重新生成"
+                      : "点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入..."
+                  }
+                  style={
+                    !currentEditedPrompt || currentEditedPrompt.trim().length === 0
+                      ? { borderColor: '#ef4444', backgroundColor: '#fef2f2' }
+                      : undefined
+                  }
                 />
                 {currentPrompt?.constraint && (
                   <div className="constraint-box">

@@ -154,10 +154,19 @@ Step 4: Generate Complete Prompt (System Refined)
 `;
 
 // Helper function to fetch with retry
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2, timeoutMs = 45000): Promise<Response> {
   for (let i = 0; i <= maxRetries; i++) {
+    // Create a fresh abort controller for each attempt
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const response = await fetch(url, options);
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       // Don't retry on client errors (4xx) or 401/403
       if (response.status < 500 || response.status === 401 || response.status === 403) {
         return response;
@@ -173,6 +182,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2)
         throw response;
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       if (i === maxRetries) {
         throw error;
       }
@@ -225,25 +235,19 @@ export async function POST(request: NextRequest) {
       .replace('{POSTER_NAME}', spec.name)
       .replace('{STYLE}', spec.posterStyle);
 
-    // Add timeout controller
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout for prompt generation
-
     let response: Response;
-    try {
-      response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`,
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
+    response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+      },
+      body: JSON.stringify({
           model: MODEL_NAME,
           messages: [
             {
@@ -267,9 +271,6 @@ export async function POST(request: NextRequest) {
           max_tokens: 1500, // Reduced from 2000
         }),
       });
-    } finally {
-      clearTimeout(timeoutId);
-    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -318,17 +319,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Extract Chinese prompt (before 负面词)
-    const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=负面词|Negative|排版布局|###|$)/);
+    // Extract Chinese prompt (includes everything after 中文提示词)
+    const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=$)/);
     if (chineseMatch) {
       chinesePrompt = chineseMatch[1].trim();
     }
 
-    // Extract layout section (排版布局)
-    // Match both with and without parentheses: "排版布局（xxx）" or "排版布局："
-    const layoutMatch = content.match(/排版布局[（:(].*?[）:]\s*([\s\S]*?)(?=$|###|$)/);
+    // Extract layout section from the chinesePrompt content
+    // Look for "排版布局：" followed by content until end or ###
+    const layoutMatch = chinesePrompt.match(/排版布局[：:]\s*([\s\S]*?)(?=$|###|$)/);
     if (layoutMatch) {
       layout = layoutMatch[1].trim();
+      // Remove layout from chinesePrompt to avoid duplication
+      chinesePrompt = chinesePrompt.replace(/排版布局[：:]\s*[\s\S]*?(?=$|###|$)/, '').trim();
     }
 
     // If still empty, use the whole content as prompt
@@ -336,9 +339,14 @@ export async function POST(request: NextRequest) {
       chinesePrompt = content;
     }
 
-    // Append layout to chinesePrompt if it exists
+    // Append formatted layout to chinesePrompt if it exists
     if (layout) {
       chinesePrompt = chinesePrompt + '\n\n【排版布局】\n' + layout;
+    }
+
+    // If still empty (API returned empty response), keep it empty for frontend to handle
+    if (!chinesePrompt || chinesePrompt.length < 10) {
+      console.log(`Empty response for ${spec.name}, returning empty prompt`);
     }
 
     console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length, 'Has layout:', !!layout);
