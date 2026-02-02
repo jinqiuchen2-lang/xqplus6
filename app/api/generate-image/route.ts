@@ -32,6 +32,15 @@ export async function POST(request: NextRequest) {
     console.log('Aspect Ratio:', ratio);
     console.log('Quality:', quality);
 
+    // Extract layout section from the original Chinese prompt before processing
+    // This preserves the specific Chinese text content (titles, labels, etc.)
+    const layoutMatch = fullPrompt.match(/【排版布局】\s*([\s\S]*?)(?=$|【|###|$)/);
+    const originalLayout = layoutMatch ? layoutMatch[1].trim() : null;
+    console.log('Original layout extracted:', originalLayout ? 'YES' : 'NO');
+    if (originalLayout) {
+      console.log('Layout content:', originalLayout.substring(0, 100) + '...');
+    }
+
     // Step 1: Full vision analysis for product fidelity
     console.log('Step 1: Complete product analysis...');
     console.log('Input prompt with constraint:', fullPrompt.substring(0, 300) + '...');
@@ -71,8 +80,8 @@ export async function POST(request: NextRequest) {
 **重要约束：**
 1. 提示词必须严格保留产品的所有视觉特征，包括颜色、款式、LOGO、材质等
 2. 必须遵守所有约束条件
-3. **排版布局中的文字内容（如标题、副标题、标签等）必须保持中文原样，不要翻译**
-4. 只翻译描述性语言和场景说明，保持具体的文字内容为中文]`
+3. 只翻译描述性语言和场景说明为英文，不要翻译排版布局部分（排版布局将单独保留）
+4. 排版布局指令将在英文提示词之后以原样中文形式添加，用于指定图像中的文字内容]`
             },
             {
               role: 'user',
@@ -117,6 +126,14 @@ export async function POST(request: NextRequest) {
     }
 
     clearTimeout(timeoutId);
+
+    // Append the original layout section (in Chinese) to the enhanced prompt
+    // This ensures the specific Chinese text content is included in the image generation
+    if (originalLayout && analysisSuccess) {
+      finalPrompt = finalPrompt + '\n\n【Layout Requirements】\n' + originalLayout;
+      console.log('Appended original layout to enhanced prompt');
+      console.log('Final prompt with layout:', finalPrompt.substring(0, 300) + '...');
+    }
 
     if (!analysisSuccess) {
       console.log('Vision analysis failed or timed out, using original prompt');
