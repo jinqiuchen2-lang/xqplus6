@@ -447,6 +447,11 @@ export default function Home() {
 
             {uploadedImages.length === 0 ? (
               <>
+                {/* Blue Upload Icon */}
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: '16px' }}>
+                  <path d="M12 15V3M12 15L8 11M12 15L16 11" stroke="var(--primary-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 15V18C3 19.1046 3.89543 20 5 20H19C20.1046 20 21 19.1046 21 18V15" stroke="var(--primary-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 <p style={{ fontSize: '16px', fontWeight: 500, marginBottom: '8px' }}>
                   点击或拖拽上传图片
                 </p>
@@ -735,20 +740,21 @@ export default function Home() {
                     onClick={() => openImageModal(item.url)}
                   />
                   <div className="history-item-content">
-                    <div className="history-item-date">
-                      {item.posterType} · {item.date}
-                    </div>
-                    <div className="history-item-prompt">{item.prompt}</div>
-                    <div className="history-item-actions">
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <div className="history-item-date">
+                        {item.posterType} · {item.date}
+                      </div>
                       <button
                         className="btn btn-secondary btn-download"
                         onClick={() =>
                           downloadImage(item.url, `poster-${item.id}.jpg`)
                         }
+                        style={{ padding: '4px 10px', fontSize: '11px' }}
                       >
                         下载
                       </button>
                     </div>
+                    <div className="history-item-prompt">{item.prompt}</div>
                   </div>
                 </div>
               ))}
