@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
 const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
-const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
-const NANO_BANANA_API_KEY = process.env.NANO_BANANA_API_KEY || API_KEY;
+const GEMINI_PRO_IMAGE_API_KEY = process.env.GEMINI_PRO_IMAGE_API_KEY;
+const GEMINI_PRO_IMAGE_BASE_URL = process.env.GEMINI_PRO_IMAGE_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
     const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
 
     console.log('=== Starting async image generation ===');
-    console.log('Model:', NANO_BANANA_MODEL);
     console.log('Aspect Ratio:', ratio);
     console.log('Quality:', quality);
 
@@ -139,42 +138,52 @@ export async function POST(request: NextRequest) {
       console.log('Vision analysis failed or timed out, using original prompt');
     }
 
-    // Step 2: Generate image using edits endpoint (image-to-image)
+    // Step 2: Generate image using Gemini Pro Image API
     console.log('Step 2: Generating image with reference...');
     console.log('Final prompt being used:', finalPrompt.substring(0, 200) + '...');
     console.log('Image reference included:', !!image);
-    console.log('Model:', NANO_BANANA_MODEL);
     console.log('Aspect Ratio:', ratio);
     console.log('Image Size:', quality);
 
-    // Convert base64 to blob for FormData
-    const imageBlob = await fetch(image).then(r => r.blob());
+    // Convert base64 image to base64 string for Gemini API
+    const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
 
-    // Use FormData according to API spec
-    // Required: model, prompt, image
-    // Optional: aspect_ratio, image_size, response_format
-    const formData = new FormData();
-    formData.append('model', NANO_BANANA_MODEL);
-    formData.append('prompt', finalPrompt);
-    formData.append('image', imageBlob);
-    formData.append('aspect_ratio', ratio);
-    formData.append('image_size', quality);
-    formData.append('response_format', 'url');
+    // Build request body for Gemini Pro Image API
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: finalPrompt },
+          {
+            inline_data: {
+              mime_type: 'image/png',
+              data: base64Data
+            }
+          }
+        ]
+      }],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: ratio,
+          imageSize: quality
+        }
+      }
+    };
 
-    console.log('FormData prepared:', {
-      model: NANO_BANANA_MODEL,
+    console.log('Request body prepared:', {
       prompt: finalPrompt.substring(0, 100) + '...',
-      aspect_ratio: ratio,
-      image_size: quality,
-      response_format: 'url'
+      aspectRatio: ratio,
+      imageSize: quality
     });
 
-    const response = await fetch(`${API_URL}/v1/images/edits`, {
+    // Add API key as query parameter
+    const url = `${GEMINI_PRO_IMAGE_BASE_URL}?key=${GEMINI_PRO_IMAGE_API_KEY}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NANO_BANANA_API_KEY}`,
+        'Content-Type': 'application/json',
       },
-      body: formData,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -195,16 +204,22 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     console.log('Image generated successfully');
+    console.log('Response data:', JSON.stringify(data, null, 2));
 
-    // Extract image URL from response
-    const imageUrl = data.data?.[0]?.url || data.url;
+    // Extract base64 image data from Gemini response
+    // Response format: { candidates: [{ content: { parts: [{ inlineData: { data: "..." } }] } }] }
+    const imageData = data.candidates?.[0]?.content?.parts?.find(
+      (part: any) => part.inlineData?.data
+    )?.inlineData?.data;
 
-    if (!imageUrl) {
+    if (!imageData) {
       console.error('Response data:', data);
-      throw new Error('No image URL in response');
+      throw new Error('No image data in response');
     }
 
-    console.log('Image URL:', imageUrl);
+    // Convert base64 to data URL
+    const imageUrl = `data:image/png;base64,${imageData}`;
+    console.log('Image URL length:', imageUrl.length);
 
     // Return the image directly instead of taskId
     return NextResponse.json({
