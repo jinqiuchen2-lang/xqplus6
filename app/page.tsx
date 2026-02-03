@@ -71,8 +71,11 @@ export default function Home() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        console.log('Loaded history from localStorage:', parsed.length, 'items');
+        console.log('First item prompt:', parsed[0]?.prompt);
         setHistory(parsed);
-      } catch {
+      } catch (e) {
+        console.error('Failed to parse history:', e);
         // Invalid data, ignore
       }
     }
@@ -376,6 +379,9 @@ export default function Home() {
         date: new Date().toLocaleString('zh-CN'),
         posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
       };
+      console.log('Saving to history:', newHistoryItem);
+      console.log('Prompt value:', currentEditedPrompt);
+      console.log('Prompt length:', currentEditedPrompt?.length);
       const newHistory = [newHistoryItem, ...history].slice(0, MAX_HISTORY_ITEMS);
       setHistory(newHistory);
     } catch (error) {
@@ -757,7 +763,7 @@ export default function Home() {
             </p>
           ) : (
             <div className="history-grid">
-              {history.map((item) => (
+              {history.map((item, index) => (
                 <div key={item.id} className="history-item">
                   <img
                     src={item.url}
@@ -782,7 +788,11 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="history-item-prompt">
-                      {item.prompt || '暂无提示词'}
+                      {item.prompt ? (
+                        <span>{item.prompt}</span>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>暂无提示词</span>
+                      )}
                     </div>
                   </div>
                 </div>
