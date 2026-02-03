@@ -787,13 +787,14 @@ export default function Home() {
                         下载
                       </button>
                     </div>
-                    <div className="history-item-prompt">
+                    {/* Prompt hidden - not displayed in history */}
+                    {/* <div className="history-item-prompt">
                       {item.prompt ? (
                         <span>{item.prompt}</span>
                       ) : (
                         <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>暂无提示词</span>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               ))}
