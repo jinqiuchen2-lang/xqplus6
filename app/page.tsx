@@ -40,6 +40,7 @@ const QUALITIES = ['1K', '2K', '4K'];
 
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
+const MAX_HISTORY_ITEMS = 5; // Limit history to avoid localStorage quota exceeded
 
 export default function Home() {
   // Image modal state
@@ -80,7 +81,21 @@ export default function Home() {
   // Save history to localStorage whenever it changes
   useEffect(() => {
     if (history.length > 0) {
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      try {
+        // Limit history to MAX_HISTORY_ITEMS to avoid quota exceeded
+        const limitedHistory = history.slice(0, MAX_HISTORY_ITEMS);
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(limitedHistory));
+      } catch (error) {
+        console.error('Failed to save history to localStorage:', error);
+        // If quota exceeded, clear old items and try again
+        try {
+          const limitedHistory = history.slice(0, 2);
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(limitedHistory));
+        } catch {
+          // If still fails, clear all history
+          localStorage.removeItem(HISTORY_STORAGE_KEY);
+        }
+      }
     }
   }, [history]);
 
@@ -353,7 +368,7 @@ export default function Home() {
       setCurrentGeneratedImage(data.imageUrl);
       setIsGeneratingImage(false);
 
-      // Add to history
+      // Add to history (limited to MAX_HISTORY_ITEMS)
       const newHistoryItem: GeneratedImage = {
         id: Date.now().toString(),
         url: data.imageUrl,
@@ -361,7 +376,8 @@ export default function Home() {
         date: new Date().toLocaleString('zh-CN'),
         posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
       };
-      setHistory([newHistoryItem, ...history]);
+      const newHistory = [newHistoryItem, ...history].slice(0, MAX_HISTORY_ITEMS);
+      setHistory(newHistory);
     } catch (error) {
       console.error('Error generating image:', error);
       alert(`生成图片失败：${error instanceof Error ? error.message : '未知错误'}`);
