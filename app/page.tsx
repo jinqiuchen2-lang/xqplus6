@@ -781,7 +781,9 @@ export default function Home() {
                         下载
                       </button>
                     </div>
-                    <div className="history-item-prompt">{item.prompt}</div>
+                    <div className="history-item-prompt">
+                      {item.prompt || '暂无提示词'}
+                    </div>
                   </div>
                 </div>
               ))}

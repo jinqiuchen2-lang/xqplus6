@@ -301,12 +301,15 @@ body {
 }
 
 .history-item-prompt {
-  font-size: 13px;
-  color: #334155;
+  font-size: 14px;
+  color: #1e293b;
   margin-top: 8px;
   margin-bottom: 12px;
+  padding: 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.5;
