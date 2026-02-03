@@ -236,6 +236,18 @@ export async function POST(request: NextRequest) {
             .replace('{POSTER_NAME}', spec.name)
             .replace('{STYLE}', spec.posterStyle);
 
+          // Special constraints for color_inspiration
+          let additionalInstructions = '';
+          if (spec.type === 'color_inspiration') {
+            additionalInstructions = `
+
+【配色灵感特殊约束 - 必须严格遵守】
+1. 排版布局中的所有文字必须是纯中文，严禁出现任何英文单词或字母
+2. 颜色描述只允许使用中文颜色名称（如：米白色、浅粉色、天蓝色），严禁出现色号（如 #FFFFFF、#FF0000 等 HEX 色值）
+3. 生成的图片上不允许出现任何英文文字，所有文字必须是中文
+4. 标题、副标题、标签等所有文字元素必须是中文`;
+          }
+
           response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
@@ -259,7 +271,7 @@ export async function POST(request: NextRequest) {
                   content: [
                     {
                       type: 'text',
-                      text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`
+                      text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。${additionalInstructions}`
                     },
                     ...images.map((img: string) => ({
                       type: 'image_url',
