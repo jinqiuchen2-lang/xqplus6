@@ -40,7 +40,7 @@ const QUALITIES = ['1K', '2K', '4K'];
 
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
-const MAX_HISTORY_ITEMS = 5; // Limit history to avoid localStorage quota exceeded
+const MAX_HISTORY_ITEMS = 10; // Limit history to avoid localStorage quota exceeded
 
 export default function Home() {
   // Image modal state
@@ -387,16 +387,24 @@ export default function Home() {
 
   const downloadImage = async (url: string, filename: string) => {
     try {
-      // Use our proxy API to download the image (avoids CORS issues)
-      const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
+      let blobUrl: string;
 
-      if (!response.ok) {
-        throw new Error('Failed to download image');
+      // Check if it's a base64 data URL
+      if (url.startsWith('data:')) {
+        // For base64 data URLs, use them directly
+        blobUrl = url;
+      } else {
+        // Use our proxy API to download the image (avoids CORS issues)
+        const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+
+        if (!response.ok) {
+          throw new Error('Failed to download image');
+        }
+
+        const blob = await response.blob();
+        blobUrl = URL.createObjectURL(blob);
       }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -405,7 +413,10 @@ export default function Home() {
       link.click();
 
       document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      // Only revoke if we created a blob URL
+      if (!url.startsWith('data:')) {
+        URL.revokeObjectURL(blobUrl);
+      }
     } catch (error) {
       console.error('Error downloading image:', error);
       alert('下载图片失败，请稍后重试');
@@ -739,7 +750,7 @@ export default function Home() {
 
         {/* Module 3: History */}
         <section className="module">
-          <h2 className="module-title">3. 生成记录</h2>
+          <h2 className="module-title">3. 生成记录 <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(只保留最近10张)</span></h2>
           {history.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
               暂无生成记录

@@ -302,12 +302,15 @@ body {
 
 .history-item-prompt {
   font-size: 13px;
-  color: var(--text-primary);
+  color: #334155;
+  margin-top: 8px;
   margin-bottom: 12px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .history-item-actions {
