@@ -489,7 +489,7 @@ export default function Home() {
                   点击或拖拽上传图片
                 </p>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品详情，logo</span>（最多8张）
+                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品信息，logo</span>（最多8张）
                 </p>
               </>
             ) : (
