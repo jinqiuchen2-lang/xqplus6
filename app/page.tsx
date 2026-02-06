@@ -441,7 +441,7 @@ export default function Home() {
     <>
       <div className="container">
         <header className="header">
-          <h1>AI棉品详情图</h1>
+          <h1>Ai详情图</h1>
         </header>
 
         {/* Module 1: Image Upload */}
