@@ -605,9 +605,10 @@ export default function Home() {
               disabled={Object.keys(prompts).length === 0}
               style={{
                 marginLeft: 'auto',
-                marginRight: '16px',
+                marginRight: '8px',
                 padding: '8px 16px',
-                fontSize: '16pt',
+                fontSize: '14px',
+                fontWeight: 'normal',
                 whiteSpace: 'nowrap',
                 backgroundColor: 'transparent',
                 borderColor: 'transparent',
