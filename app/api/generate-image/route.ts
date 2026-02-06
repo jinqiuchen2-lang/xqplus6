@@ -12,7 +12,7 @@ const PROXY_API_KEY = process.env.PROXY_API_KEY || 'sk-BBUADo4NEY066P3Q7PKJh2g4y
 const PROXY_MODEL = process.env.PROXY_MODEL || 'nano-banana-2';
 
 // Helper function to create multipart/form-data body
-function createFormData(fields: Record<string, string>, file: { buffer: Buffer; filename: string; contentType: string }): { body: Uint8Array; contentType: string } {
+function createFormData(fields: Record<string, string>, file: { buffer: Buffer; filename: string; contentType: string }): { body: BodyInit; contentType: string } {
   const boundary = `----FormBoundary${Date.now()}`;
   const chunks: Buffer[] = [];
 
@@ -35,7 +35,7 @@ function createFormData(fields: Record<string, string>, file: { buffer: Buffer; 
 
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
 
-  const body = new Uint8Array(Buffer.concat(chunks));
+  const body = Buffer.concat(chunks);
   const contentType = `multipart/form-data; boundary=${boundary}`;
 
   return { body, contentType };
