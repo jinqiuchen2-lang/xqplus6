@@ -321,6 +321,16 @@ export default function Home() {
     }
   };
 
+  // Clear all prompts
+  const clearAllPrompts = () => {
+    if (Object.keys(prompts).length === 0) return;
+    if (!confirm('确定要清空所有提示词吗？')) return;
+
+    setPrompts({});
+    setEditedPrompts({});
+    setTabsTriedGenerating({});
+  };
+
   // Module 2: Prompt & Generate Functions
   const currentPrompt = prompts[activeTab];
   const currentEditedPrompt = editedPrompts[activeTab] || '';
@@ -588,6 +598,34 @@ export default function Home() {
                 )}
               </div>
             ))}
+            {/* 清空按钮 - 放在生成按钮前面 */}
+            <button
+              className="btn btn-secondary"
+              onClick={clearAllPrompts}
+              disabled={Object.keys(prompts).length === 0}
+              style={{
+                marginLeft: 'auto',
+                marginRight: '8px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                whiteSpace: 'nowrap',
+                backgroundColor: Object.keys(prompts).length === 0 ? '#94a3b8' : '#ef4444',
+                borderColor: Object.keys(prompts).length === 0 ? '#94a3b8' : '#ef4444',
+                cursor: Object.keys(prompts).length === 0 ? 'not-allowed' : 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                if (Object.keys(prompts).length > 0) {
+                  e.currentTarget.style.backgroundColor = '#dc2626';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (Object.keys(prompts).length > 0) {
+                  e.currentTarget.style.backgroundColor = '#ef4444';
+                }
+              }}
+            >
+              清空
+            </button>
             {/* 自动生成全部提示词按钮 - 放在Tab右侧 */}
             <button
               className="btn btn-primary"
