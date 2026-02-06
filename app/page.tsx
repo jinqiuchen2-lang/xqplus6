@@ -600,27 +600,28 @@ export default function Home() {
             ))}
             {/* 清空按钮 - 放在生成按钮前面 */}
             <button
-              className="btn btn-secondary"
+              className="btn"
               onClick={clearAllPrompts}
               disabled={Object.keys(prompts).length === 0}
               style={{
                 marginLeft: 'auto',
-                marginRight: '8px',
+                marginRight: '16px',
                 padding: '8px 16px',
-                fontSize: '14px',
+                fontSize: '16pt',
                 whiteSpace: 'nowrap',
-                backgroundColor: Object.keys(prompts).length === 0 ? '#94a3b8' : '#ef4444',
-                borderColor: Object.keys(prompts).length === 0 ? '#94a3b8' : '#ef4444',
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                color: Object.keys(prompts).length === 0 ? '#94a3b8' : '#5079FF',
                 cursor: Object.keys(prompts).length === 0 ? 'not-allowed' : 'pointer'
               }}
               onMouseEnter={(e) => {
                 if (Object.keys(prompts).length > 0) {
-                  e.currentTarget.style.backgroundColor = '#dc2626';
+                  e.currentTarget.style.color = '#4366e0';
                 }
               }}
               onMouseLeave={(e) => {
                 if (Object.keys(prompts).length > 0) {
-                  e.currentTarget.style.backgroundColor = '#ef4444';
+                  e.currentTarget.style.color = '#5079FF';
                 }
               }}
             >
