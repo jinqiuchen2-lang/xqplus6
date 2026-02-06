@@ -6,9 +6,14 @@ const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
 const GEMINI_PRO_IMAGE_API_KEY = process.env.GEMINI_PRO_IMAGE_API_KEY;
 const GEMINI_PRO_IMAGE_BASE_URL = process.env.GEMINI_PRO_IMAGE_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent';
 
+// Proxy mode configuration
+const PROXY_API_URL = process.env.PROXY_API_URL || 'https://ai.comfly.chat';
+const PROXY_API_KEY = process.env.PROXY_API_KEY || 'sk-BBUADo4NEY066P3Q7PKJh2g4y3pP6CPy3hNFBt7cQqwBMVma';
+const PROXY_MODEL = process.env.PROXY_MODEL || 'nano-banana-2';
+
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt, ratio = '1:1', quality = '2K', constraint } = await request.json();
+    const { image, prompt, ratio = '1:1', quality = '2K', constraint, mode = 'official' } = await request.json();
 
     if (!image) {
       return NextResponse.json(
@@ -28,9 +33,71 @@ export async function POST(request: NextRequest) {
     const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
 
     console.log('=== Starting async image generation ===');
+    console.log('Mode:', mode);
     console.log('Aspect Ratio:', ratio);
     console.log('Quality:', quality);
 
+    // Proxy mode: use the nano-banana-2 API directly
+    if (mode === 'proxy') {
+      console.log('Using proxy mode with nano-banana-2 API');
+
+      // Convert base64 image to blob for FormData
+      const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+      const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
+
+      // Create FormData for the proxy API
+      const formData = new FormData();
+      formData.append('model', PROXY_MODEL);
+      formData.append('prompt', fullPrompt);
+      formData.append('image', imageBlob, 'image.png');
+      formData.append('response_format', 'url');
+      formData.append('aspect_ratio', ratio);
+      formData.append('image_size', quality);
+
+      console.log('Proxy API request:', {
+        model: PROXY_MODEL,
+        prompt: fullPrompt.substring(0, 100) + '...',
+        aspect_ratio: ratio,
+        image_size: quality
+      });
+
+      const proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PROXY_API_KEY}`,
+        },
+        body: formData,
+      });
+
+      if (!proxyResponse.ok) {
+        const errorText = await proxyResponse.text();
+        console.error('Proxy API Error:', errorText);
+        throw new Error(`中转API调用失败: ${proxyResponse.status}`);
+      }
+
+      const proxyData = await proxyResponse.json();
+      console.log('Proxy API response:', proxyData);
+
+      // Extract image URL from proxy response
+      // The response format follows OpenAI Dall-e format
+      const imageUrl = proxyData.data?.[0]?.url || proxyData.url;
+
+      if (!imageUrl) {
+        console.error('Proxy response data:', proxyData);
+        throw new Error('中转API未返回图片URL');
+      }
+
+      console.log('Proxy mode image generated successfully');
+
+      return NextResponse.json({
+        success: true,
+        imageUrl,
+        message: '图片生成成功（中转模式）'
+      });
+    }
+
+    // Official mode: use the existing Gemini Pro Image API
     // Extract layout section from the original Chinese prompt before processing
     // This preserves the specific Chinese text content (titles, labels, etc.)
     const layoutMatch = fullPrompt.match(/【排版布局】\s*([\s\S]*?)(?=$|【|###|$)/);

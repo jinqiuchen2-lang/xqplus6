@@ -37,6 +37,10 @@ const TABS = [
 
 const RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
 const QUALITIES = ['1K', '2K', '4K'];
+const MODES = [
+  { id: 'official', name: '官方模式' },
+  { id: 'proxy', name: '中转模式' },
+];
 
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
@@ -58,6 +62,7 @@ export default function Home() {
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [selectedQuality, setSelectedQuality] = useState('2K');
+  const [selectedMode, setSelectedMode] = useState('official');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
   const [tabsTriedGenerating, setTabsTriedGenerating] = useState<Record<string, boolean>>({});
@@ -353,6 +358,7 @@ export default function Home() {
           constraint: constraint, // Send constraint to backend
           ratio: selectedRatio,
           quality: selectedQuality,
+          mode: selectedMode,
         }),
       });
 
@@ -703,6 +709,21 @@ export default function Home() {
                     {QUALITIES.map((quality) => (
                       <option key={quality} value={quality}>
                         {quality}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="control-group" style={{ flex: 1 }}>
+                  <label className="control-label">模式</label>
+                  <select
+                    className="control-select"
+                    value={selectedMode}
+                    onChange={(e) => setSelectedMode(e.target.value)}
+                  >
+                    {MODES.map((mode) => (
+                      <option key={mode.id} value={mode.id}>
+                        {mode.name}
                       </option>
                     ))}
                   </select>
