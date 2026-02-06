@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import FormData from 'form-data';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
@@ -11,6 +10,36 @@ const GEMINI_PRO_IMAGE_BASE_URL = process.env.GEMINI_PRO_IMAGE_BASE_URL || 'http
 const PROXY_API_URL = process.env.PROXY_API_URL || 'https://ai.comfly.chat';
 const PROXY_API_KEY = process.env.PROXY_API_KEY || 'sk-BBUADo4NEY066P3Q7PKJh2g4y3pP6CPy3hNFBt7cQqwBMVma';
 const PROXY_MODEL = process.env.PROXY_MODEL || 'nano-banana-2';
+
+// Helper function to create multipart/form-data body
+function createFormData(fields: Record<string, string>, file: { buffer: Buffer; filename: string; contentType: string }): { body: Buffer; contentType: string } {
+  const boundary = `----FormBoundary${Date.now()}`;
+  const chunks: Buffer[] = [];
+
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(
+      Buffer.from(`--${boundary}\r\n`),
+      Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`),
+      Buffer.from(`${value}\r\n`)
+    );
+  }
+
+  // Add file
+  chunks.push(
+    Buffer.from(`--${boundary}\r\n`),
+    Buffer.from(`Content-Disposition: form-data; name="image"; filename="${file.filename}"\r\n`),
+    Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`),
+    file.buffer,
+    Buffer.from(`\r\n`)
+  );
+
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+
+  const body = Buffer.concat(chunks);
+  const contentType = `multipart/form-data; boundary=${boundary}`;
+
+  return { body, contentType };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,18 +75,21 @@ export async function POST(request: NextRequest) {
       const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
       const imageBuffer = Buffer.from(base64Data, 'base64');
 
-      // Create FormData using form-data package for Node.js compatibility
-      const formData = new FormData();
-
-      formData.append('model', PROXY_MODEL);
-      formData.append('prompt', fullPrompt);
-      formData.append('image', imageBuffer, {
-        filename: 'image.png',
-        contentType: 'image/png'
-      });
-      formData.append('response_format', 'url');
-      formData.append('aspect_ratio', ratio);
-      formData.append('image_size', quality);
+      // Create multipart/form-data body
+      const { body, contentType } = createFormData(
+        {
+          model: PROXY_MODEL,
+          prompt: fullPrompt,
+          response_format: 'url',
+          aspect_ratio: ratio,
+          image_size: quality
+        },
+        {
+          buffer: imageBuffer,
+          filename: 'image.png',
+          contentType: 'image/png'
+        }
+      );
 
       console.log('Proxy API request:', {
         model: PROXY_MODEL,
@@ -66,16 +98,13 @@ export async function POST(request: NextRequest) {
         image_size: quality
       });
 
-      // Get the content-type header with boundary from form-data
-      const headers = formData.getHeaders();
-      headers['Authorization'] = `Bearer ${PROXY_API_KEY}`;
-
       const proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
         method: 'POST',
-        headers: headers,
-        body: formData,
-        // @ts-ignore - form-data is compatible with fetch body
-        duplex: 'half'
+        headers: {
+          'Authorization': `Bearer ${PROXY_API_KEY}`,
+          'Content-Type': contentType
+        },
+        body: body,
       });
 
       if (!proxyResponse.ok) {
