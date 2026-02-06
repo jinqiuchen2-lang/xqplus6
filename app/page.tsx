@@ -61,7 +61,7 @@ export default function Home() {
   const [prompts, setPrompts] = useState<Record<string, PromptData>>({});
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [selectedRatio, setSelectedRatio] = useState('1:1');
-  const [selectedQuality, setSelectedQuality] = useState('2K');
+  const [selectedQuality, setSelectedQuality] = useState('1K');
   const [selectedMode, setSelectedMode] = useState('official');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
