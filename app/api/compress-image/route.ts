@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 
+// Vercel has a 4.5MB request limit, set safer limit to account for base64 encoding overhead
+// Base64 encoding increases size by ~33%, so 2MB original = ~2.7MB encoded
+const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -16,40 +20,30 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Check file size (4.3MB = 4.3 * 1024 * 1024 bytes)
-    const MAX_SIZE = 4.3 * 1024 * 1024;
+    console.log('Original image size:', buffer.length, 'bytes');
 
-    if (buffer.length <= MAX_SIZE) {
-      // No compression needed
-      const base64 = buffer.toString('base64');
-      const mimeType = file.type;
-      return NextResponse.json({
-        compressed: false,
-        dataUrl: `data:${mimeType};base64,${base64}`,
-        size: buffer.length
-      });
-    }
-
-    // Compress the image
+    // Always compress to ensure consistent size
     let compressedBuffer: Buffer = buffer;
-    let quality = 90;
+    let quality = 85;
     let scale = 1;
 
-    while (compressedBuffer.length > MAX_SIZE && quality > 10) {
+    while (compressedBuffer.length > MAX_SIZE && quality > 20) {
       compressedBuffer = await sharp(buffer)
         .resize({
-          width: Math.round(2000 * scale),
-          height: Math.round(2000 * scale),
+          width: Math.round(1920 * scale),
+          height: Math.round(1920 * scale),
           fit: 'inside',
           withoutEnlargement: true
         })
-        .jpeg({ quality })
+        .jpeg({ quality, progressive: true })
         .toBuffer();
+
+      console.log('Compressed to:', compressedBuffer.length, 'bytes (quality:', quality, 'scale:', scale + ')');
 
       if (compressedBuffer.length > MAX_SIZE) {
         quality -= 10;
-        if (quality < 50) {
-          scale -= 0.1;
+        if (quality < 60) {
+          scale -= 0.15;
         }
       }
     }
@@ -58,7 +52,7 @@ export async function POST(request: NextRequest) {
     const mimeType = 'image/jpeg';
 
     return NextResponse.json({
-      compressed: true,
+      compressed: buffer.length !== compressedBuffer.length,
       dataUrl: `data:${mimeType};base64,${base64}`,
       originalSize: buffer.length,
       compressedSize: compressedBuffer.length
