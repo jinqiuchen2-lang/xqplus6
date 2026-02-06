@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import FormData from 'form-data';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
@@ -41,16 +42,19 @@ export async function POST(request: NextRequest) {
     if (mode === 'proxy') {
       console.log('Using proxy mode with nano-banana-2 API');
 
-      // Convert base64 image to blob for FormData
+      // Convert base64 image to buffer
       const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
       const imageBuffer = Buffer.from(base64Data, 'base64');
-      const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
 
-      // Create FormData for the proxy API
+      // Create FormData using form-data package for Node.js compatibility
       const formData = new FormData();
+
       formData.append('model', PROXY_MODEL);
       formData.append('prompt', fullPrompt);
-      formData.append('image', imageBlob, 'image.png');
+      formData.append('image', imageBuffer, {
+        filename: 'image.png',
+        contentType: 'image/png'
+      });
       formData.append('response_format', 'url');
       formData.append('aspect_ratio', ratio);
       formData.append('image_size', quality);
@@ -62,22 +66,27 @@ export async function POST(request: NextRequest) {
         image_size: quality
       });
 
+      // Get the content-type header with boundary from form-data
+      const headers = formData.getHeaders();
+      headers['Authorization'] = `Bearer ${PROXY_API_KEY}`;
+
       const proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${PROXY_API_KEY}`,
-        },
+        headers: headers,
         body: formData,
+        // @ts-ignore - form-data is compatible with fetch body
+        duplex: 'half'
       });
 
       if (!proxyResponse.ok) {
         const errorText = await proxyResponse.text();
-        console.error('Proxy API Error:', errorText);
-        throw new Error(`中转API调用失败: ${proxyResponse.status}`);
+        console.error('Proxy API Error Status:', proxyResponse.status);
+        console.error('Proxy API Error Body:', errorText);
+        throw new Error(`中转API调用失败: ${proxyResponse.status} - ${errorText}`);
       }
 
       const proxyData = await proxyResponse.json();
-      console.log('Proxy API response:', proxyData);
+      console.log('Proxy API response:', JSON.stringify(proxyData, null, 2));
 
       // Extract image URL from proxy response
       // The response format follows OpenAI Dall-e format
@@ -88,7 +97,7 @@ export async function POST(request: NextRequest) {
         throw new Error('中转API未返回图片URL');
       }
 
-      console.log('Proxy mode image generated successfully');
+      console.log('Proxy mode image generated successfully, URL:', imageUrl);
 
       return NextResponse.json({
         success: true,
