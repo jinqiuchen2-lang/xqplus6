@@ -573,7 +573,7 @@ export default function Home() {
                 key={tab.id}
                 className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
-                style={{ flex: '0 0 auto', fontSize: '15px' }}
+                style={{ flex: '0 0 auto', fontSize: '18px' }}
               >
                 {tab.name}
                 {prompts[tab.id] && (
@@ -608,7 +608,7 @@ export default function Home() {
                   生成中...
                 </span>
               ) : (
-                '自动生成全部提示词'
+                '生成全部提示词'
               )}
             </button>
           </div>
@@ -651,7 +651,7 @@ export default function Home() {
                         <span className="spinner" style={{ width: 10, height: 10 }} />
                       </span>
                     ) : (
-                      '自动生成单个提示词'
+                      '生成单个提示词'
                     )}
                   </button>
                 </div>
@@ -661,10 +661,10 @@ export default function Home() {
                   onChange={(e) => handlePromptChange(e.target.value)}
                   placeholder={
                     !tabsTriedGenerating[activeTab]
-                      ? "请点击自动生成全部提示词或者自动生成单个提示词"
+                      ? "请点击生成全部提示词或者生成单个提示词"
                       : (!currentEditedPrompt || currentEditedPrompt.trim().length === 0
                         ? "提示词生成失败或为空，请重新生成"
-                        : "点击'自动生成全部提示词'或'自动生成单个提示词'按钮生成提示词，或手动输入...")
+                        : "点击'生成全部提示词'或'生成单个提示词'按钮生成提示词，或手动输入...")
                   }
                   style={
                     tabsTriedGenerating[activeTab] && (!currentEditedPrompt || currentEditedPrompt.trim().length === 0)
