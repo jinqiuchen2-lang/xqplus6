@@ -598,36 +598,6 @@ export default function Home() {
                 )}
               </div>
             ))}
-            {/* 清空按钮 - 放在生成按钮前面 */}
-            <button
-              className="btn"
-              onClick={clearAllPrompts}
-              disabled={Object.keys(prompts).length === 0}
-              style={{
-                marginLeft: '16px',
-                marginRight: '4px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: 'normal',
-                whiteSpace: 'nowrap',
-                backgroundColor: 'transparent',
-                borderColor: 'transparent',
-                color: Object.keys(prompts).length === 0 ? '#94a3b8' : '#5079FF',
-                cursor: Object.keys(prompts).length === 0 ? 'not-allowed' : 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                if (Object.keys(prompts).length > 0) {
-                  e.currentTarget.style.color = '#4366e0';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (Object.keys(prompts).length > 0) {
-                  e.currentTarget.style.color = '#5079FF';
-                }
-              }}
-            >
-              清空
-            </button>
             {/* 自动生成全部提示词按钮 - 放在Tab右侧 */}
             <button
               className="btn btn-primary"
@@ -650,6 +620,35 @@ export default function Home() {
               ) : (
                 '生成全部提示词'
               )}
+            </button>
+            {/* 清空按钮 - 放在生成按钮右侧 */}
+            <button
+              className="btn"
+              onClick={clearAllPrompts}
+              disabled={Object.keys(prompts).length === 0}
+              style={{
+                marginLeft: '8px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: 'normal',
+                whiteSpace: 'nowrap',
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                color: Object.keys(prompts).length === 0 ? '#94a3b8' : '#5079FF',
+                cursor: Object.keys(prompts).length === 0 ? 'not-allowed' : 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                if (Object.keys(prompts).length > 0) {
+                  e.currentTarget.style.color = '#4366e0';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (Object.keys(prompts).length > 0) {
+                  e.currentTarget.style.color = '#5079FF';
+                }
+              }}
+            >
+              清空
             </button>
           </div>
 
