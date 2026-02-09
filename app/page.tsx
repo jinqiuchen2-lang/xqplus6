@@ -165,7 +165,7 @@ export default function Home() {
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 5 - uploadedImages.length;
-    const MAX_TOTAL_SIZE = 3.5 * 1024 * 1024; // 3.5MB total limit
+    const MAX_TOTAL_SIZE = 3.0 * 1024 * 1024; // 3MB total limit
     const MAX_SINGLE_SIZE = 3.3 * 1024 * 1024; // 3.3MB per image limit
 
     // Step 1: Convert all files to dataUrl without compression
