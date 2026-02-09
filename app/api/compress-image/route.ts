@@ -4,9 +4,9 @@ import sharp from 'sharp';
 // For FormData (multipart) upload: 4.3MB limit (no base64 overhead)
 const MAX_INPUT_SIZE = 4.3 * 1024 * 1024;
 
-// For base64 output in JSON: need to account for 33% base64 encoding overhead
-// and stay under Vercel's 4.5MB request limit
-const MAX_OUTPUT_SIZE = 2 * 1024 * 1024; // 2MB (base64 encoded ~2.7MB)
+// For base64 output: compress to 3MB (base64 encoded ~4MB)
+// This is a good balance between quality and size for Vercel's 4.5MB limit
+const MAX_OUTPUT_SIZE = 3 * 1024 * 1024; // 3MB (base64 encoded ~4MB)
 
 export async function POST(request: NextRequest) {
   try {

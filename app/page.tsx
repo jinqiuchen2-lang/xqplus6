@@ -46,7 +46,7 @@ const MODES = [
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
 const MAX_HISTORY_ITEMS = 10; // Limit history to avoid localStorage quota exceeded
 // Maximum base64 data URL length (approximately 2.5MB to stay safe)
-const MAX_BASE64_LENGTH = 2.5 * 1024 * 1024 * 4 / 3; // Account for base64 encoding overhead
+const MAX_BASE64_LENGTH = 4 * 1024 * 1024; // 4MB base64 string length
 
 // Helper function to check if images are too large
 function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: string } {
@@ -133,8 +133,8 @@ export default function Home() {
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 8 - uploadedImages.length;
-    // Target max base64 size (approximately 2.7MB to stay safe)
-    const MAX_BASE64_SIZE = 2.7 * 1024 * 1024;
+    // Target max base64 size (approximately 4MB for better quality)
+    const MAX_BASE64_SIZE = 4 * 1024 * 1024;
 
     for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
       const file = files[i];
