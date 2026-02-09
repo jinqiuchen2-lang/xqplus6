@@ -143,61 +143,108 @@ export default function Home() {
   }, [history]);
 
   // Module 1: Image Upload Functions
+  // Helper function to compress a single image to a target size
+  const compressImage = async (file: File, targetSize: number): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('targetSize', targetSize.toString());
+
+    const response = await fetch('/api/compress-image', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || '压缩失败');
+    }
+
+    const data = await response.json();
+    return data.dataUrl;
+  };
+
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 5 - uploadedImages.length;
-    // Target max base64 size (approximately 3.3MB to stay safe)
-    const MAX_BASE64_SIZE = 3.3 * 1024 * 1024;
+    const MAX_TOTAL_SIZE = 3.5 * 1024 * 1024; // 3.5MB total limit
+    const MAX_SINGLE_SIZE = 3.3 * 1024 * 1024; // 3.3MB per image limit
 
+    // Step 1: Convert all files to dataUrl without compression
     for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
       const file = files[i];
       if (!file.type.startsWith('image/')) continue;
 
-      let dataUrl: string;
-
-      // First, convert to dataUrl
-      const initialDataUrl = await fileToDataUrl(file);
-
-      // Check if compression is needed
-      if (initialDataUrl.length > MAX_BASE64_SIZE) {
-        console.log(`Image ${i + 1} needs compression: ${(initialDataUrl.length / 1024 / 1024).toFixed(2)}MB`);
-
-        // Compress image via API
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-          const response = await fetch('/api/compress-image', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            dataUrl = data.dataUrl;
-            console.log(`Compressed to ${(dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
-          } else {
-            const errorData = await response.json();
-            console.error('Compression failed:', errorData);
-            alert(`图片压缩失败：${errorData.error || '未知错误'}\n请尝试上传更小的图片`);
-            continue;
-          }
-        } catch (error) {
-          console.error('Compression error:', error);
-          alert('图片压缩失败，请尝试上传更小的图片');
-          continue;
-        }
-      } else {
-        dataUrl = initialDataUrl;
-      }
-
+      const dataUrl = await fileToDataUrl(file);
       newImages.push({
         id: `${Date.now()}-${i}`,
         dataUrl,
         file,
       });
+    }
+
+    if (newImages.length === 0) {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Step 2: Calculate total size
+    const totalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
+    console.log(`Total size before compression: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+
+    // Step 3: Check if total compression is needed
+    if (totalSize > MAX_TOTAL_SIZE) {
+      console.log('Total size exceeds 3.5MB, compressing all images...');
+
+      // Calculate target size for each image proportionally
+      const compressionPromises = newImages.map(async (img) => {
+        const currentSize = img.dataUrl.length;
+        const proportion = currentSize / totalSize;
+        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.9); // 0.9 to leave some buffer
+        const minTargetSize = Math.min(targetSize, MAX_SINGLE_SIZE);
+
+        console.log(`Compressing image to ${(minTargetSize / 1024 / 1024).toFixed(2)}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
+
+        try {
+          const compressedDataUrl = await compressImage(img.file, minTargetSize);
+          return {
+            ...img,
+            dataUrl: compressedDataUrl,
+          };
+        } catch (error) {
+          console.error('Compression error:', error);
+          // If compression fails, keep original
+          return img;
+        }
+      });
+
+      const compressedImages = await Promise.all(compressionPromises);
+      newImages.length = 0;
+      newImages.push(...compressedImages);
+
+      const newTotalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
+      console.log(`Total size after compression: ${(newTotalSize / 1024 / 1024).toFixed(2)}MB`);
+    } else {
+      // Step 4: Check individual images for compression
+      for (let i = 0; i < newImages.length; i++) {
+        const img = newImages[i];
+        if (img.dataUrl.length > MAX_SINGLE_SIZE) {
+          console.log(`Image ${i + 1} exceeds 3.3MB, compressing...`);
+          try {
+            const compressedDataUrl = await compressImage(img.file, MAX_SINGLE_SIZE);
+            newImages[i] = {
+              ...img,
+              dataUrl: compressedDataUrl,
+            };
+          } catch (error) {
+            console.error('Compression error:', error);
+          }
+        }
+      }
     }
 
     setUploadedImages([...uploadedImages, ...newImages]);

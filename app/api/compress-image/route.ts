@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const targetSizeStr = formData.get('targetSize') as string | null;
+    const targetSize = targetSizeStr ? parseInt(targetSizeStr, 10) : MAX_OUTPUT_SIZE;
 
     if (!file) {
       return NextResponse.json(
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     console.log('Original image size:', (buffer.length / 1024 / 1024).toFixed(2), 'MB');
+    console.log('Target size:', (targetSize / 1024 / 1024).toFixed(2), 'MB');
 
     // Check input size (FormData has no base64 overhead)
     if (buffer.length > MAX_INPUT_SIZE) {
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
     let attempts = 0;
     const maxAttempts = 15;
 
-    while (compressedBuffer.length > MAX_OUTPUT_SIZE && attempts < maxAttempts) {
+    while (compressedBuffer.length > targetSize && attempts < maxAttempts) {
       attempts++;
       console.log(`Compression attempt ${attempts}: current size ${(compressedBuffer.length / 1024 / 1024).toFixed(2)}MB, quality: ${quality}, scale: ${scale}`);
 
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Final check
-    if (compressedBuffer.length > MAX_OUTPUT_SIZE) {
+    if (compressedBuffer.length > targetSize) {
       console.error('Failed to compress image to target size');
       return NextResponse.json(
         { error: `图片压缩失败，无法压缩到目标大小。请尝试上传更小的图片或降低分辨率。` },
