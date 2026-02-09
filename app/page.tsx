@@ -45,21 +45,21 @@ const MODES = [
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
 const MAX_HISTORY_ITEMS = 10; // Limit history to avoid localStorage quota exceeded
-// Maximum image size in bytes (3MB to account for base64 encoding overhead)
-const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+// Maximum base64 data URL length (approximately 2.5MB to stay safe)
+const MAX_BASE64_LENGTH = 2.5 * 1024 * 1024 * 4 / 3; // Account for base64 encoding overhead
 
 // Helper function to check if images are too large
 function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: string } {
   for (let i = 0; i < images.length; i++) {
     const img = images[i];
-    // Get the base64 data size (excluding the data:image/...;base64, prefix)
-    const base64Data = img.dataUrl.split(',')[1] || img.dataUrl;
-    const sizeInBytes = (base64Data.length * 3) / 4; // Approximate original size
+    // Check the actual base64 data URL length
+    const base64Length = img.dataUrl.length;
+    const sizeInMB = (base64Length / 1024 / 1024).toFixed(2);
 
-    if (sizeInBytes > MAX_IMAGE_SIZE) {
+    if (base64Length > MAX_BASE64_LENGTH) {
       return {
         valid: false,
-        message: `图片 ${i + 1} 太大（${(sizeInBytes / 1024 / 1024).toFixed(2)}MB），请删除后重新上传。当前最大支持3MB。`
+        message: `图片 ${i + 1} 太大（${sizeInMB}MB），请删除后重新上传。请尝试上传更小的图片或降低图片分辨率。`
       };
     }
   }

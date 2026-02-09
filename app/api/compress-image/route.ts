@@ -6,7 +6,8 @@ const MAX_INPUT_SIZE = 4.3 * 1024 * 1024;
 
 // For base64 output in JSON: need to account for 33% base64 encoding overhead
 // and stay under Vercel's 4.5MB request limit
-const MAX_OUTPUT_SIZE = 2.5 * 1024 * 1024; // 2.5MB (base64 encoded ~3.3MB)
+// Reduce to 2MB to ensure we stay well under the limit
+const MAX_OUTPUT_SIZE = 2 * 1024 * 1024; // 2MB (base64 encoded ~2.7MB)
 
 export async function POST(request: NextRequest) {
   try {
