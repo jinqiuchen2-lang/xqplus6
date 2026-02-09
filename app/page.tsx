@@ -133,16 +133,22 @@ export default function Home() {
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 8 - uploadedImages.length;
+    // Target max base64 size (approximately 2.7MB to stay safe)
+    const MAX_BASE64_SIZE = 2.7 * 1024 * 1024;
 
     for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
       const file = files[i];
       if (!file.type.startsWith('image/')) continue;
 
-      // Check if compression is needed (> 4.3MB)
-      const maxSize = 4.3 * 1024 * 1024;
       let dataUrl: string;
 
-      if (file.size > maxSize) {
+      // First, convert to dataUrl
+      const initialDataUrl = await fileToDataUrl(file);
+
+      // Check if compression is needed
+      if (initialDataUrl.length > MAX_BASE64_SIZE) {
+        console.log(`Image ${i + 1} needs compression: ${(initialDataUrl.length / 1024 / 1024).toFixed(2)}MB`);
+
         // Compress image via API
         const formData = new FormData();
         formData.append('file', file);
@@ -156,15 +162,20 @@ export default function Home() {
           if (response.ok) {
             const data = await response.json();
             dataUrl = data.dataUrl;
+            console.log(`Compressed to ${(dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
           } else {
-            // Fallback to client-side compression
-            dataUrl = await compressImageClient(file, maxSize);
+            const errorData = await response.json();
+            console.error('Compression failed:', errorData);
+            alert(`图片压缩失败：${errorData.error || '未知错误'}\n请尝试上传更小的图片`);
+            continue;
           }
-        } catch {
-          dataUrl = await compressImageClient(file, maxSize);
+        } catch (error) {
+          console.error('Compression error:', error);
+          alert('图片压缩失败，请尝试上传更小的图片');
+          continue;
         }
       } else {
-        dataUrl = await fileToDataUrl(file);
+        dataUrl = initialDataUrl;
       }
 
       newImages.push({
@@ -175,44 +186,6 @@ export default function Home() {
     }
 
     setUploadedImages([...uploadedImages, ...newImages]);
-  };
-
-  const compressImageClient = (file: File, maxSize: number): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        let quality = 0.9;
-
-        const doCompress = () => {
-          canvas.width = width;
-          canvas.height = height;
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-          const size = dataUrl.length * 0.75;
-
-          if (size > maxSize && quality > 0.1) {
-            quality -= 0.1;
-            if (quality < 0.5) {
-              width = Math.round(width * 0.9);
-              height = Math.round(height * 0.9);
-            }
-            doCompress();
-          } else {
-            resolve(dataUrl);
-          }
-        };
-
-        doCompress();
-      };
-
-      img.src = URL.createObjectURL(file);
-    });
   };
 
   const fileToDataUrl = (file: File): Promise<string> => {
