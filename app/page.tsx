@@ -50,6 +50,7 @@ const MAX_BASE64_LENGTH = 3.3 * 1024 * 1024; // 3.3MB base64 string length
 
 // Helper function to check if images are too large
 function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: string } {
+  // Check individual images
   for (let i = 0; i < images.length; i++) {
     const img = images[i];
     // Check the actual base64 data URL length
@@ -63,6 +64,20 @@ function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: s
       };
     }
   }
+
+  // Check total size of all images combined (Vercel limit is 4.5MB)
+  const totalSize = images.reduce((sum, img) => sum + img.dataUrl.length, 0);
+  const totalSizeInMB = (totalSize / 1024 / 1024).toFixed(2);
+  // Reserve 1MB for JSON overhead, prompt text, etc.
+  const MAX_TOTAL_SIZE = 3.5 * 1024 * 1024; // 3.5MB for all images combined
+
+  if (totalSize > MAX_TOTAL_SIZE) {
+    return {
+      valid: false,
+      message: `${images.length}张图片总大小为${totalSizeInMB}MB，超过3.5MB限制。请减少图片数量或上传更小的图片。`
+    };
+  }
+
   return { valid: true };
 }
 
