@@ -131,10 +131,14 @@ export default function Home() {
 
   // Module 1: Image Upload Functions
   // Helper function to compress a single image to a target size
-  const compressImage = async (file: File, targetSize: number): Promise<string> => {
+  // targetSize is the desired base64 size in bytes
+  const compressImage = async (file: File, targetBase64Size: number): Promise<string> => {
+    // Convert base64 target size to buffer target size (base64 is ~4/3 of buffer size)
+    const targetBufferSize = Math.floor(targetBase64Size * 0.75); // Leave some margin
+
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('targetSize', targetSize.toString());
+    formData.append('targetSize', targetBufferSize.toString());
 
     const response = await fetch('/api/compress-image', {
       method: 'POST',
