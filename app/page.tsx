@@ -132,7 +132,7 @@ export default function Home() {
     if (!files) return;
 
     const newImages: UploadedImage[] = [];
-    const remainingSlots = 8 - uploadedImages.length;
+    const remainingSlots = 5 - uploadedImages.length;
     // Target max base64 size (approximately 3.3MB to stay safe)
     const MAX_BASE64_SIZE = 3.3 * 1024 * 1024;
 
@@ -540,7 +540,7 @@ export default function Home() {
                   点击或拖拽上传图片
                 </p>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品信息，logo</span>（最多8张）
+                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品信息，logo</span>（最多5张）
                 </p>
               </>
             ) : (
