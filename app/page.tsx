@@ -604,8 +604,8 @@ export default function Home() {
               onClick={clearAllPrompts}
               disabled={Object.keys(prompts).length === 0}
               style={{
-                marginLeft: 'auto',
-                marginRight: '8px',
+                marginLeft: '16px',
+                marginRight: '4px',
                 padding: '8px 16px',
                 fontSize: '14px',
                 fontWeight: 'normal',
