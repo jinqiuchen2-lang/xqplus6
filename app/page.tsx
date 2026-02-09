@@ -134,8 +134,8 @@ export default function Home() {
   // targetSize is the desired base64 size in bytes
   const compressImage = async (file: File, targetBase64Size: number): Promise<string> => {
     // Convert base64 target size to buffer target size (base64 is ~4/3 of buffer size)
-    // Use 0.7 to be more conservative and ensure the result is under the limit
-    const targetBufferSize = Math.floor(targetBase64Size * 0.7);
+    // Use 0.65 to be even more conservative
+    const targetBufferSize = Math.floor(targetBase64Size * 0.65);
 
     console.log(`[compressImage] Target base64 size: ${(targetBase64Size / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[compressImage] Target buffer size: ${(targetBufferSize / 1024 / 1024).toFixed(2)}MB`);
@@ -165,8 +165,8 @@ export default function Home() {
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 5 - uploadedImages.length;
-    const MAX_TOTAL_SIZE = 3.0 * 1024 * 1024; // 3MB total limit
-    const MAX_SINGLE_SIZE = 3.3 * 1024 * 1024; // 3.3MB per image limit
+    const MAX_TOTAL_SIZE = 2.5 * 1024 * 1024; // 2.5MB total limit (more conservative)
+    const MAX_SINGLE_SIZE = 2.5 * 1024 * 1024; // 2.5MB per image limit
 
     // Step 1: Convert all files to dataUrl without compression
     for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
@@ -196,21 +196,20 @@ export default function Home() {
 
     // Step 3: Check if total compression is needed
     if (totalSize > MAX_TOTAL_SIZE) {
-      console.log('[handleFileSelect] Total size exceeds 3.5MB, compressing all images...');
+      console.log('[handleFileSelect] Total size exceeds limit, compressing all images...');
 
       // Calculate target size for each image proportionally
-      // Use more aggressive compression to ensure we stay under limit
+      // Use very conservative allocation: 70% of MAX_TOTAL_SIZE
       const compressionPromises = newImages.map(async (img) => {
         const currentSize = img.dataUrl.length;
         const proportion = currentSize / totalSize;
-        // Allocate 80% of MAX_TOTAL_SIZE to leave room for JSON overhead
-        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.8);
-        const minTargetSize = Math.min(targetSize, MAX_SINGLE_SIZE);
+        // Allocate 70% of MAX_TOTAL_SIZE to leave room for JSON overhead and base64 encoding
+        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.7);
 
-        console.log(`[handleFileSelect] Compressing image ${minTargetSize / 1024 / 1024}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
+        console.log(`[handleFileSelect] Compressing to ${(targetSize / 1024 / 1024).toFixed(2)}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
 
         try {
-          const compressedDataUrl = await compressImage(img.file, minTargetSize);
+          const compressedDataUrl = await compressImage(img.file, targetSize);
           return {
             ...img,
             dataUrl: compressedDataUrl,
@@ -235,8 +234,8 @@ export default function Home() {
         const secondRoundPromises = newImages.map(async (img) => {
           const currentSize = img.dataUrl.length;
           const proportion = currentSize / newTotalSize;
-          // Use even more aggressive compression: 60% of MAX_TOTAL_SIZE
-          const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.6);
+          // Use even more aggressive compression: 50% of MAX_TOTAL_SIZE
+          const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.5);
 
           try {
             const compressedDataUrl = await compressImage(img.file, targetSize);
@@ -262,7 +261,7 @@ export default function Home() {
       for (let i = 0; i < newImages.length; i++) {
         const img = newImages[i];
         if (img.dataUrl.length > MAX_SINGLE_SIZE) {
-          console.log(`[handleFileSelect] Image ${i + 1} exceeds 3.3MB, compressing...`);
+          console.log(`[handleFileSelect] Image ${i + 1} exceeds limit, compressing...`);
           try {
             const compressedDataUrl = await compressImage(img.file, MAX_SINGLE_SIZE);
             newImages[i] = {
