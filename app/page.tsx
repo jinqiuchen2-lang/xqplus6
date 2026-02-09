@@ -201,6 +201,11 @@ export default function Home() {
     }
 
     setUploadedImages([...uploadedImages, ...newImages]);
+
+    // Reset file input to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const fileToDataUrl = (file: File): Promise<string> => {
@@ -580,7 +585,10 @@ export default function Home() {
                   {uploadedImages.length < 8 && (
                     <div
                       className="image-preview-item add-button"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
