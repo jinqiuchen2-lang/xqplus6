@@ -45,6 +45,26 @@ const MODES = [
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
 const MAX_HISTORY_ITEMS = 10; // Limit history to avoid localStorage quota exceeded
+// Maximum image size in bytes (3MB to account for base64 encoding overhead)
+const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+
+// Helper function to check if images are too large
+function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: string } {
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    // Get the base64 data size (excluding the data:image/...;base64, prefix)
+    const base64Data = img.dataUrl.split(',')[1] || img.dataUrl;
+    const sizeInBytes = (base64Data.length * 3) / 4; // Approximate original size
+
+    if (sizeInBytes > MAX_IMAGE_SIZE) {
+      return {
+        valid: false,
+        message: `图片 ${i + 1} 太大（${(sizeInBytes / 1024 / 1024).toFixed(2)}MB），请删除后重新上传。当前最大支持3MB。`
+      };
+    }
+  }
+  return { valid: true };
+}
 
 export default function Home() {
   // Image modal state
@@ -227,6 +247,13 @@ export default function Home() {
       return;
     }
 
+    // Check image sizes before sending
+    const sizeCheck = checkImageSizes(uploadedImages);
+    if (!sizeCheck.valid) {
+      alert(sizeCheck.message);
+      return;
+    }
+
     setIsGeneratingPrompts(true);
 
     try {
@@ -301,6 +328,13 @@ export default function Home() {
   const generateSinglePrompt = async () => {
     if (uploadedImages.length === 0) {
       alert('请先上传图片');
+      return;
+    }
+
+    // Check image sizes before sending
+    const sizeCheck = checkImageSizes(uploadedImages);
+    if (!sizeCheck.valid) {
+      alert(sizeCheck.message);
       return;
     }
 
