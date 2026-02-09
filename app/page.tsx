@@ -816,7 +816,7 @@ export default function Home() {
 
         {/* Module 3: History */}
         <section className="module">
-          <h2 className="module-title">3. 生成记录 <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(只保留最近10张)</span></h2>
+          <h2 className="module-title">3. 生成记录 <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>(请尽快保存图片，缓存历史不稳定)</span></h2>
           {history.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
               暂无生成记录
