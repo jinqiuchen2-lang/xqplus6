@@ -134,7 +134,12 @@ export default function Home() {
   // targetSize is the desired base64 size in bytes
   const compressImage = async (file: File, targetBase64Size: number): Promise<string> => {
     // Convert base64 target size to buffer target size (base64 is ~4/3 of buffer size)
-    const targetBufferSize = Math.floor(targetBase64Size * 0.75); // Leave some margin
+    // Use 0.7 to be more conservative and ensure the result is under the limit
+    const targetBufferSize = Math.floor(targetBase64Size * 0.7);
+
+    console.log(`[compressImage] Target base64 size: ${(targetBase64Size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[compressImage] Target buffer size: ${(targetBufferSize / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[compressImage] Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -151,6 +156,7 @@ export default function Home() {
     }
 
     const data = await response.json();
+    console.log(`[compressImage] Compressed dataUrl size: ${(data.dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
     return data.dataUrl;
   };
 
@@ -168,6 +174,7 @@ export default function Home() {
       if (!file.type.startsWith('image/')) continue;
 
       const dataUrl = await fileToDataUrl(file);
+      console.log(`[handleFileSelect] Image ${i + 1} original size: ${(dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
       newImages.push({
         id: `${Date.now()}-${i}`,
         dataUrl,
@@ -185,20 +192,22 @@ export default function Home() {
 
     // Step 2: Calculate total size
     const totalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
-    console.log(`Total size before compression: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[handleFileSelect] Total size before compression: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
 
     // Step 3: Check if total compression is needed
     if (totalSize > MAX_TOTAL_SIZE) {
-      console.log('Total size exceeds 3.5MB, compressing all images...');
+      console.log('[handleFileSelect] Total size exceeds 3.5MB, compressing all images...');
 
       // Calculate target size for each image proportionally
+      // Use more aggressive compression to ensure we stay under limit
       const compressionPromises = newImages.map(async (img) => {
         const currentSize = img.dataUrl.length;
         const proportion = currentSize / totalSize;
-        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.9); // 0.9 to leave some buffer
+        // Allocate 80% of MAX_TOTAL_SIZE to leave room for JSON overhead
+        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.8);
         const minTargetSize = Math.min(targetSize, MAX_SINGLE_SIZE);
 
-        console.log(`Compressing image to ${(minTargetSize / 1024 / 1024).toFixed(2)}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
+        console.log(`[handleFileSelect] Compressing image ${minTargetSize / 1024 / 1024}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
 
         try {
           const compressedDataUrl = await compressImage(img.file, minTargetSize);
@@ -207,7 +216,7 @@ export default function Home() {
             dataUrl: compressedDataUrl,
           };
         } catch (error) {
-          console.error('Compression error:', error);
+          console.error('[handleFileSelect] Compression error:', error);
           // If compression fails, keep original
           return img;
         }
@@ -218,13 +227,42 @@ export default function Home() {
       newImages.push(...compressedImages);
 
       const newTotalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
-      console.log(`Total size after compression: ${(newTotalSize / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`[handleFileSelect] Total size after compression: ${(newTotalSize / 1024 / 1024).toFixed(2)}MB`);
+
+      // Additional safety check: if still too large, compress even more
+      if (newTotalSize > MAX_TOTAL_SIZE) {
+        console.log('[handleFileSelect] Still exceeds limit, applying second round compression...');
+        const secondRoundPromises = newImages.map(async (img) => {
+          const currentSize = img.dataUrl.length;
+          const proportion = currentSize / newTotalSize;
+          // Use even more aggressive compression: 60% of MAX_TOTAL_SIZE
+          const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.6);
+
+          try {
+            const compressedDataUrl = await compressImage(img.file, targetSize);
+            return {
+              ...img,
+              dataUrl: compressedDataUrl,
+            };
+          } catch (error) {
+            console.error('[handleFileSelect] Second round compression error:', error);
+            return img;
+          }
+        });
+
+        const secondRoundImages = await Promise.all(secondRoundPromises);
+        newImages.length = 0;
+        newImages.push(...secondRoundImages);
+
+        const finalTotalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
+        console.log(`[handleFileSelect] Final total size: ${(finalTotalSize / 1024 / 1024).toFixed(2)}MB`);
+      }
     } else {
       // Step 4: Check individual images for compression
       for (let i = 0; i < newImages.length; i++) {
         const img = newImages[i];
         if (img.dataUrl.length > MAX_SINGLE_SIZE) {
-          console.log(`Image ${i + 1} exceeds 3.3MB, compressing...`);
+          console.log(`[handleFileSelect] Image ${i + 1} exceeds 3.3MB, compressing...`);
           try {
             const compressedDataUrl = await compressImage(img.file, MAX_SINGLE_SIZE);
             newImages[i] = {
@@ -232,7 +270,7 @@ export default function Home() {
               dataUrl: compressedDataUrl,
             };
           } catch (error) {
-            console.error('Compression error:', error);
+            console.error('[handleFileSelect] Compression error:', error);
           }
         }
       }
