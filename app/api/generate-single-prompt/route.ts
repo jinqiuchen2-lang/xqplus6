@@ -46,8 +46,8 @@ const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle
   color_inspiration: {
     name: '配色灵感',
     posterId: '海报07',
-    posterStyle: 'Moodboard',
-    instruction: `配色灵感（Moodboard，需要详细排版布局说明）`,
+    posterStyle: '配色灵感',
+    instruction: `配色灵感（需要详细排版布局说明）`,
   },
 };
 

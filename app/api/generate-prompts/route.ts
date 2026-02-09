@@ -52,8 +52,8 @@ const PROMPT_SPECS = [
     name: '配色灵感',
     type: 'color_inspiration',
     posterId: '海报07',
-    posterStyle: 'Moodboard',
-    instruction: `配色灵感（Moodboard，需要详细排版布局说明）`
+    posterStyle: '配色灵感',
+    instruction: `配色灵感（需要详细排版布局说明）`
   }
 ];
 
