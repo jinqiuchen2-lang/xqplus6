@@ -238,7 +238,21 @@ export default function Home() {
         }),
       });
 
-      const data = await response.json();
+      // Handle 413 error (payload too large)
+      if (response.status === 413) {
+        throw new Error('图片太大，请删除当前图片并重新上传');
+      }
+
+      // Try to parse JSON, handle non-JSON responses
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('服务器响应错误，请稍后重试');
+      }
 
       if (!response.ok) {
         console.error('API Error:', data);
@@ -302,7 +316,21 @@ export default function Home() {
         }),
       });
 
-      const data = await response.json();
+      // Handle 413 error (payload too large)
+      if (response.status === 413) {
+        throw new Error('图片太大，请删除当前图片并重新上传');
+      }
+
+      // Try to parse JSON, handle non-JSON responses
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('服务器响应错误，请稍后重试');
+      }
 
       if (!response.ok) {
         console.error('API Error:', data);
