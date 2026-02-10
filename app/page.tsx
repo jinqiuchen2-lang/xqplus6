@@ -45,24 +45,45 @@ const MODES = [
 // Storage keys
 const HISTORY_STORAGE_KEY = 'poster-generator-history';
 const MAX_HISTORY_ITEMS = 10; // Limit history to avoid localStorage quota exceeded
-// Maximum base64 data URL length (approximately 3.3MB)
-const MAX_BASE64_LENGTH = 3.3 * 1024 * 1024; // 3.3MB base64 string length
+
+// Compression constants (shared with upload handler)
+const TOTAL_BUDGET = 3.0 * 1024 * 1024; // 3MB total budget
+const MAX_SINGLE_SIZE = 3.3 * 1024 * 1024; // 3.3MB per image limit
+
+// Calculate base64 string actual size in bytes (shared helper)
+function calculateBase64Size(base64String: string): number {
+  const parts = base64String.split(',');
+  if (parts.length < 2) return base64String.length;
+  // Base64 encoded size is approximately 4/3 of original binary size
+  // So actual size = base64StringLength * (3/4)
+  return Math.floor(parts[1].length * 0.75);
+}
 
 // Helper function to check if images are too large
 function checkImageSizes(images: UploadedImage[]): { valid: boolean; message?: string } {
-  // Check individual images only (total size is now automatically compressed during upload)
+  // Check individual images
   for (let i = 0; i < images.length; i++) {
     const img = images[i];
-    // Check the actual base64 data URL length
-    const base64Length = img.dataUrl.length;
-    const sizeInMB = (base64Length / 1024 / 1024).toFixed(2);
+    const actualSize = calculateBase64Size(img.dataUrl);
+    const sizeInMB = (actualSize / 1024 / 1024).toFixed(2);
 
-    if (base64Length > MAX_BASE64_LENGTH) {
+    if (actualSize > MAX_SINGLE_SIZE) {
       return {
         valid: false,
         message: `图片 ${i + 1} 太大（${sizeInMB}MB），请删除后重新上传。请尝试上传更小的图片或降低图片分辨率。`
       };
     }
+  }
+
+  // Check total size of all images combined
+  const totalSize = images.reduce((sum, img) => sum + calculateBase64Size(img.dataUrl), 0);
+  const totalSizeInMB = (totalSize / 1024 / 1024).toFixed(2);
+
+  if (totalSize > TOTAL_BUDGET) {
+    return {
+      valid: false,
+      message: `${images.length}张图片总大小为${totalSizeInMB}MB，超过3MB限制。请减少图片数量或上传更小的图片。`
+    };
   }
 
   return { valid: true };
@@ -130,149 +151,156 @@ export default function Home() {
   }, [history]);
 
   // Module 1: Image Upload Functions
-  // Helper function to compress a single image to a target size
-  // targetSize is the desired base64 size in bytes
-  const compressImage = async (file: File, targetBase64Size: number): Promise<string> => {
-    // Convert base64 target size to buffer target size (base64 is ~4/3 of buffer size)
-    // Use 0.65 to be even more conservative
-    const targetBufferSize = Math.floor(targetBase64Size * 0.65);
 
-    console.log(`[compressImage] Target base64 size: ${(targetBase64Size / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`[compressImage] Target buffer size: ${(targetBufferSize / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`[compressImage] Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+  // Compression constants
+  const MAX_WIDTH = 1280; // Max width for AI recognition
+  const MIN_QUALITY = 0.3;
+  const INITIAL_QUALITY = 0.8;
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('targetSize', targetBufferSize.toString());
-
-    const response = await fetch('/api/compress-image', {
-      method: 'POST',
-      body: formData,
+  // Load image from file
+  function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
     });
+  }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || '压缩失败');
+  // Compress image using Canvas
+  async function canvasCompress(file: File, quality: number): Promise<string> {
+    const img = await loadImageFromFile(file);
+
+    // Calculate new dimensions (max width 1280px, maintain aspect ratio)
+    let width = img.width;
+    let height = img.height;
+
+    if (width > MAX_WIDTH) {
+      height = Math.round((height * MAX_WIDTH) / width);
+      width = MAX_WIDTH;
     }
 
-    const data = await response.json();
-    console.log(`[compressImage] Compressed dataUrl size: ${(data.dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
-    return data.dataUrl;
-  };
+    // Create canvas and compress
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('无法创建 Canvas 上下文');
+    }
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Convert to blob then to dataUrl
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('压缩失败'));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            URL.revokeObjectURL(img.src); // Clean up object URL
+            resolve(dataUrl);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    });
+  }
+
+  // Smart compression with dynamic target size
+  async function smartCompress(file: File, targetSize: number): Promise<string> {
+    console.log(`[smartCompress] Compressing to target size: ${(targetSize / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[smartCompress] Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+
+    let quality = INITIAL_QUALITY;
+    let dataUrl = await canvasCompress(file, quality);
+    let currentSize = calculateBase64Size(dataUrl);
+
+    console.log(`[smartCompress] Initial compression: quality=${quality}, size=${(currentSize / 1024 / 1024).toFixed(2)}MB`);
+
+    // If still over target size and quality not at minimum, continue reducing
+    while (currentSize > targetSize && quality > MIN_QUALITY) {
+      quality -= 0.1;
+      quality = Math.max(quality, MIN_QUALITY); // Ensure minimum
+
+      dataUrl = await canvasCompress(file, quality);
+      currentSize = calculateBase64Size(dataUrl);
+
+      console.log(`[smartCompress] Reduced quality to ${quality}, size=${(currentSize / 1024 / 1024).toFixed(2)}MB`);
+    }
+
+    console.log(`[smartCompress] Final: quality=${quality}, size=${(currentSize / 1024 / 1024).toFixed(2)}MB`);
+    return dataUrl;
+  }
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
 
     const newImages: UploadedImage[] = [];
     const remainingSlots = 5 - uploadedImages.length;
-    const MAX_TOTAL_SIZE = 2.5 * 1024 * 1024; // 2.5MB total limit (more conservative)
-    const MAX_SINGLE_SIZE = 2.5 * 1024 * 1024; // 2.5MB per image limit
+    const filesToProcess = Math.min(files.length, remainingSlots);
 
-    // Step 1: Convert all files to dataUrl without compression
-    for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
+    // Calculate dynamic quota per image
+    const targetSizePerImage = Math.floor(TOTAL_BUDGET / filesToProcess);
+
+    console.log(`[handleFileSelect] Processing ${filesToProcess} files`);
+    console.log(`[handleFileSelect] Target size per image: ${(targetSizePerImage / 1024 / 1024).toFixed(2)}MB`);
+
+    // Process each file with smart compression
+    for (let i = 0; i < filesToProcess; i++) {
       const file = files[i];
       if (!file.type.startsWith('image/')) continue;
 
-      const dataUrl = await fileToDataUrl(file);
-      console.log(`[handleFileSelect] Image ${i + 1} original size: ${(dataUrl.length / 1024 / 1024).toFixed(2)}MB`);
-      newImages.push({
-        id: `${Date.now()}-${i}`,
-        dataUrl,
-        file,
-      });
+      try {
+        // Compress with dynamic target size
+        const compressedDataUrl = await smartCompress(file, targetSizePerImage);
+
+        // Check if single image exceeds limit
+        const actualSize = calculateBase64Size(compressedDataUrl);
+        if (actualSize > MAX_SINGLE_SIZE) {
+          alert(`图片 ${i + 1} 压缩后仍然过大（${(actualSize / 1024 / 1024).toFixed(2)}MB），请上传更小的图片`);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+
+        newImages.push({
+          id: `${Date.now()}-${i}`,
+          dataUrl: compressedDataUrl,
+          file,
+        });
+
+        console.log(`[handleFileSelect] Image ${i + 1} processed successfully`);
+      } catch (error) {
+        console.error(`[handleFileSelect] Error processing image ${i + 1}:`, error);
+        alert(`图片 ${i + 1} 处理失败，请重试`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
     }
 
-    if (newImages.length === 0) {
-      // Reset file input
+    // Calculate total size after compression
+    const totalSize = newImages.reduce((sum, img) => sum + calculateBase64Size(img.dataUrl), 0);
+    console.log(`[handleFileSelect] Total size after compression: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+
+    // Final check: ensure total doesn't exceed budget
+    if (totalSize > TOTAL_BUDGET) {
+      alert(`压缩后图片总大小为${(totalSize / 1024 / 1024).toFixed(2)}MB，超过3MB限制。请减少图片数量或上传更小的图片。`);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       return;
-    }
-
-    // Step 2: Calculate total size
-    const totalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
-    console.log(`[handleFileSelect] Total size before compression: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
-
-    // Step 3: Check if total compression is needed
-    if (totalSize > MAX_TOTAL_SIZE) {
-      console.log('[handleFileSelect] Total size exceeds limit, compressing all images...');
-
-      // Calculate target size for each image proportionally
-      // Use very conservative allocation: 70% of MAX_TOTAL_SIZE
-      const compressionPromises = newImages.map(async (img) => {
-        const currentSize = img.dataUrl.length;
-        const proportion = currentSize / totalSize;
-        // Allocate 70% of MAX_TOTAL_SIZE to leave room for JSON overhead and base64 encoding
-        const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.7);
-
-        console.log(`[handleFileSelect] Compressing to ${(targetSize / 1024 / 1024).toFixed(2)}MB (current: ${(currentSize / 1024 / 1024).toFixed(2)}MB)`);
-
-        try {
-          const compressedDataUrl = await compressImage(img.file, targetSize);
-          return {
-            ...img,
-            dataUrl: compressedDataUrl,
-          };
-        } catch (error) {
-          console.error('[handleFileSelect] Compression error:', error);
-          // If compression fails, keep original
-          return img;
-        }
-      });
-
-      const compressedImages = await Promise.all(compressionPromises);
-      newImages.length = 0;
-      newImages.push(...compressedImages);
-
-      const newTotalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
-      console.log(`[handleFileSelect] Total size after compression: ${(newTotalSize / 1024 / 1024).toFixed(2)}MB`);
-
-      // Additional safety check: if still too large, compress even more
-      if (newTotalSize > MAX_TOTAL_SIZE) {
-        console.log('[handleFileSelect] Still exceeds limit, applying second round compression...');
-        const secondRoundPromises = newImages.map(async (img) => {
-          const currentSize = img.dataUrl.length;
-          const proportion = currentSize / newTotalSize;
-          // Use even more aggressive compression: 50% of MAX_TOTAL_SIZE
-          const targetSize = Math.floor(MAX_TOTAL_SIZE * proportion * 0.5);
-
-          try {
-            const compressedDataUrl = await compressImage(img.file, targetSize);
-            return {
-              ...img,
-              dataUrl: compressedDataUrl,
-            };
-          } catch (error) {
-            console.error('[handleFileSelect] Second round compression error:', error);
-            return img;
-          }
-        });
-
-        const secondRoundImages = await Promise.all(secondRoundPromises);
-        newImages.length = 0;
-        newImages.push(...secondRoundImages);
-
-        const finalTotalSize = newImages.reduce((sum, img) => sum + img.dataUrl.length, 0);
-        console.log(`[handleFileSelect] Final total size: ${(finalTotalSize / 1024 / 1024).toFixed(2)}MB`);
-      }
-    } else {
-      // Step 4: Check individual images for compression
-      for (let i = 0; i < newImages.length; i++) {
-        const img = newImages[i];
-        if (img.dataUrl.length > MAX_SINGLE_SIZE) {
-          console.log(`[handleFileSelect] Image ${i + 1} exceeds limit, compressing...`);
-          try {
-            const compressedDataUrl = await compressImage(img.file, MAX_SINGLE_SIZE);
-            newImages[i] = {
-              ...img,
-              dataUrl: compressedDataUrl,
-            };
-          } catch (error) {
-            console.error('[handleFileSelect] Compression error:', error);
-          }
-        }
-      }
     }
 
     setUploadedImages([...uploadedImages, ...newImages]);
@@ -635,7 +663,7 @@ export default function Home() {
                   点击或拖拽上传图片
                 </p>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品信息，logo</span>（最多5张，总大小不超过3.5M）
+                  建议上传：<span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>正面，产品细节，商品信息，logo</span>（最多5张，系统会智能压缩）
                 </p>
               </>
             ) : (
