@@ -60,6 +60,8 @@ function createFormDataWithImages(
 }
 
 export async function POST(request: NextRequest) {
+  // Set a longer timeout for this route (5 minutes)
+  // Note: This requires the Next.js server to support timeout configuration
   try {
     const { images, prompt, ratio = '1:1', quality = '2K', constraint, mode = 'official' } = await request.json();
 
@@ -141,14 +143,30 @@ export async function POST(request: NextRequest) {
         content_type: contentType
       });
 
-      const proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${PROXY_API_KEY}`,
-          'Content-Type': contentType
-        },
-        body: body,
-      });
+      // Add timeout controller for proxy API (3 minutes)
+      const proxyController = new AbortController();
+      const proxyTimeoutId = setTimeout(() => proxyController.abort(), 180000); // 3 minutes
+
+      let proxyResponse: Response;
+      try {
+        proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${PROXY_API_KEY}`,
+            'Content-Type': contentType
+          },
+          body: body,
+          signal: proxyController.signal,
+        });
+        clearTimeout(proxyTimeoutId);
+      } catch (fetchError: any) {
+        clearTimeout(proxyTimeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('Proxy API request timed out after 3 minutes');
+          throw new Error('中转API请求超时，请减少图片数量或降低图片质量后重试');
+        }
+        throw fetchError;
+      }
 
       if (!proxyResponse.ok) {
         const errorText = await proxyResponse.text();
@@ -347,13 +365,30 @@ export async function POST(request: NextRequest) {
 
     // Add API key as query parameter
     const url = `${GEMINI_PRO_IMAGE_BASE_URL}?key=${GEMINI_PRO_IMAGE_API_KEY}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+
+    // Add timeout controller for Gemini API (3 minutes)
+    const geminiController = new AbortController();
+    const geminiTimeoutId = setTimeout(() => geminiController.abort(), 180000); // 3 minutes
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: geminiController.signal,
+      });
+      clearTimeout(geminiTimeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(geminiTimeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('Gemini API request timed out after 3 minutes');
+        throw new Error('图片生成超时，请减少图片数量或降低图片质量后重试');
+      }
+      throw fetchError;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -398,7 +433,42 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in generate-image API:', error);
+    console.error('=== Error in generate-image API ===');
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+    // Check for specific error types
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return NextResponse.json(
+          {
+            error: '请求超时，请减少图片数量后重试',
+            details: error.message
+          },
+          { status: 408 }
+        );
+      }
+      if (error.message.includes('JSON') || error.message.includes('parse')) {
+        return NextResponse.json(
+          {
+            error: 'API响应解析失败',
+            details: error.message
+          },
+          { status: 502 }
+        );
+      }
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        return NextResponse.json(
+          {
+            error: '网络连接失败，请检查网络后重试',
+            details: error.message
+          },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         error: '生成图片失败，请稍后重试',

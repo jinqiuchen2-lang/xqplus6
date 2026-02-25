@@ -522,6 +522,10 @@ export default function Home() {
     const constraint = currentPrompt?.constraint || '';
 
     try {
+      // Create timeout controller (5 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+
       // Generate image
       const response = await fetch('/api/generate-image', {
         method: 'POST',
@@ -534,7 +538,10 @@ export default function Home() {
           quality: selectedQuality,
           mode: selectedMode,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -566,7 +573,20 @@ export default function Home() {
       setHistory(newHistory);
     } catch (error) {
       console.error('Error generating image:', error);
-      alert(`生成图片失败：${error instanceof Error ? error.message : '未知错误'}`);
+
+      // Handle specific error types
+      let errorMessage = '未知错误';
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = '请求超时（超过5分钟），请尝试减少图片数量或降低图片质量';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = '网络连接失败，请检查网络连接或稍后重试';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      alert(`生成图片失败：${errorMessage}`);
       setIsGeneratingImage(false);
     }
   };
