@@ -521,7 +521,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: uploadedImages[0].dataUrl,
+          images: uploadedImages.map((img) => img.dataUrl),
           prompt: currentEditedPrompt,
           constraint: constraint, // Send constraint to backend
           ratio: selectedRatio,

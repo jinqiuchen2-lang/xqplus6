@@ -11,12 +11,21 @@ const PROXY_API_URL = process.env.PROXY_API_URL || 'https://ai.comfly.chat';
 const PROXY_API_KEY = process.env.PROXY_API_KEY || 'sk-BBUADo4NEY066P3Q7PKJh2g4y3pP6CPy3hNFBt7cQqwBMVma';
 const PROXY_MODEL = process.env.PROXY_MODEL || 'nano-banana-2';
 
-// Helper function to create multipart/form-data body
-function createFormData(fields: Record<string, string>, file: { buffer: Buffer; filename: string; contentType: string }): { body: BodyInit; contentType: string } {
+// Helper function to create multipart/form-data body with multiple images
+// Uses indexed field names (image[0], image[1], etc.) for proper multi-image support
+function createFormDataWithImages(
+  fields: Record<string, string>,
+  files: { buffer: Buffer; filename: string; contentType: string }[]
+): { body: BodyInit; contentType: string } {
   const boundary = `----FormBoundary${Date.now()}`;
   const chunks: Buffer[] = [];
 
+  console.log('[createFormDataWithImages] Creating multipart form data with', files.length, 'images');
+
+  // Add text fields
   for (const [name, value] of Object.entries(fields)) {
+    const valuePreview = value.length > 50 ? value.substring(0, 50) + '...' : value;
+    console.log(`[createFormDataWithImages] Adding field: ${name} = ${valuePreview}`);
     chunks.push(
       Buffer.from(`--${boundary}\r\n`),
       Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`),
@@ -24,28 +33,37 @@ function createFormData(fields: Record<string, string>, file: { buffer: Buffer; 
     );
   }
 
-  // Add file
-  chunks.push(
-    Buffer.from(`--${boundary}\r\n`),
-    Buffer.from(`Content-Disposition: form-data; name="image"; filename="${file.filename}"\r\n`),
-    Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`),
-    file.buffer,
-    Buffer.from(`\r\n`)
-  );
+  // Add multiple image files with indexed field names (image[0], image[1], etc.)
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const fieldName = `image[${i}]`;
+    const fileSizeKB = Math.round(file.buffer.length / 1024);
+    console.log(`[createFormDataWithImages] Adding image ${i}: ${fieldName}, filename=${file.filename}, size=${fileSizeKB}KB, type=${file.contentType}`);
+    chunks.push(
+      Buffer.from(`--${boundary}\r\n`),
+      Buffer.from(`Content-Disposition: form-data; name="${fieldName}"; filename="${file.filename}"\r\n`),
+      Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`),
+      file.buffer,
+      Buffer.from(`\r\n`)
+    );
+  }
 
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
 
   const body = Buffer.concat(chunks);
+  const totalSizeKB = Math.round(body.length / 1024);
   const contentType = `multipart/form-data; boundary=${boundary}`;
+
+  console.log(`[createFormDataWithImages] Total multipart body size: ${totalSizeKB}KB`);
 
   return { body, contentType };
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt, ratio = '1:1', quality = '2K', constraint, mode = 'official' } = await request.json();
+    const { images, prompt, ratio = '1:1', quality = '2K', constraint, mode = 'official' } = await request.json();
 
-    if (!image) {
+    if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
         { error: '请提供图片' },
         { status: 400 }
@@ -59,6 +77,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Log detailed image information
+    console.log('=== Image Upload Verification ===');
+    console.log('Total images received:', images.length);
+    images.forEach((img: string, index: number) => {
+      const hasBase64Prefix = img.includes('base64,');
+      const base64Part = hasBase64Prefix ? img.split('base64,')[1] : img;
+      const dataLength = base64Part?.length || 0;
+      const estimatedSizeKB = Math.round(dataLength * 0.75 / 1024); // base64 is ~4/3 of original
+      const mimeType = img.match(/data:image\/([^;]+)/)?.[1] || 'unknown';
+      console.log(`  Image ${index}: mimeType=${mimeType}, base64Length=${dataLength}, estimatedSize=${estimatedSizeKB}KB`);
+    });
+
     // Combine constraint with prompt if provided
     const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
 
@@ -66,17 +96,31 @@ export async function POST(request: NextRequest) {
     console.log('Mode:', mode);
     console.log('Aspect Ratio:', ratio);
     console.log('Quality:', quality);
+    console.log('Prompt length:', fullPrompt.length);
+    console.log('Constraint:', constraint ? 'YES' : 'NO');
 
     // Proxy mode: use the nano-banana-2 API directly
     if (mode === 'proxy') {
-      console.log('Using proxy mode with nano-banana-2 API');
+      console.log('=== PROXY MODE: nano-banana-2 ===');
+      console.log('Number of images to send:', images.length);
+      console.log('Proxy API URL:', `${PROXY_API_URL}/v1/images/edits`);
+      console.log('Model:', PROXY_MODEL);
 
-      // Convert base64 image to buffer
-      const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
-      const imageBuffer = Buffer.from(base64Data, 'base64');
+      // Convert all base64 images to buffers with detailed logging
+      const imageBuffers = images.map((img: string, index: number) => {
+        const base64Data = img.includes('base64,') ? img.split('base64,')[1] : img;
+        const buffer = Buffer.from(base64Data, 'base64');
+        const sizeKB = Math.round(buffer.length / 1024);
+        console.log(`  [Image ${index}] Buffer size: ${sizeKB}KB`);
+        return {
+          buffer,
+          filename: `image${index + 1}.png`,
+          contentType: 'image/png'
+        };
+      });
 
-      // Create multipart/form-data body
-      const { body, contentType } = createFormData(
+      // Create multipart/form-data body with multiple images
+      const { body, contentType } = createFormDataWithImages(
         {
           model: PROXY_MODEL,
           prompt: fullPrompt,
@@ -84,18 +128,17 @@ export async function POST(request: NextRequest) {
           aspect_ratio: ratio,
           image_size: quality
         },
-        {
-          buffer: imageBuffer,
-          filename: 'image.png',
-          contentType: 'image/png'
-        }
+        imageBuffers
       );
 
-      console.log('Proxy API request:', {
+      console.log('=== Sending Request to Proxy API ===');
+      console.log('Request params:', {
         model: PROXY_MODEL,
         prompt: fullPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
-        image_size: quality
+        image_size: quality,
+        image_count: imageBuffers.length,
+        content_type: contentType
       });
 
       const proxyResponse = await fetch(`${PROXY_API_URL}/v1/images/edits`, {
@@ -136,6 +179,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Official mode: use the existing Gemini Pro Image API
+    console.log('=== OFFICIAL MODE: Gemini Pro Image API ===');
+
     // Extract layout section from the original Chinese prompt before processing
     // This preserves the specific Chinese text content (titles, labels, etc.)
     const layoutMatch = fullPrompt.match(/【排版布局】\s*([\s\S]*?)(?=$|【|###|$)/);
@@ -146,7 +191,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Full vision analysis for product fidelity
-    console.log('Step 1: Complete product analysis...');
+    console.log('=== Step 1: Vision Analysis ===');
+    console.log('Number of images for analysis:', images.length);
     console.log('Input prompt with constraint:', fullPrompt.substring(0, 300) + '...');
     let finalPrompt = fullPrompt;
 
@@ -155,6 +201,17 @@ export async function POST(request: NextRequest) {
 
     let analysisSuccess = false;
     try {
+      // Build messages with all images for analysis
+      const imageContents = images.map((img: string, index: number) => {
+        const urlPreview = img.length > 50 ? img.substring(0, 50) + '...' : img;
+        console.log(`  [Analysis Image ${index}] ${urlPreview}`);
+        return {
+          type: 'image_url',
+          image_url: { url: img }
+        };
+      });
+      console.log('Total image contents for analysis:', imageContents.length);
+
       const analysisResponse = await fetch(`${API_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: {
@@ -192,12 +249,9 @@ export async function POST(request: NextRequest) {
               content: [
                 {
                   type: 'text',
-                  text: `请分析这张产品图片，并基于以下用户提示词生成英文增强版提示词（直接输出英文提示词，不要包含其他内容）：\n\n${fullPrompt}`
+                  text: `请分析这些产品图片（共${images.length}张），并基于以下用户提示词生成英文增强版提示词（直接输出英文提示词，不要包含其他内容）：\n\n${fullPrompt}`
                 },
-                {
-                  type: 'image_url',
-                  image_url: { url: image }
-                }
+                ...imageContents
               ]
             }
           ],
@@ -244,27 +298,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Generate image using Gemini Pro Image API
-    console.log('Step 2: Generating image with reference...');
+    console.log('=== Step 2: Image Generation ===');
     console.log('Final prompt being used:', finalPrompt.substring(0, 200) + '...');
-    console.log('Image reference included:', !!image);
+    console.log('Number of reference images:', images.length);
     console.log('Aspect Ratio:', ratio);
     console.log('Image Size:', quality);
 
-    // Convert base64 image to base64 string for Gemini API
-    const base64Data = image.includes('base64,') ? image.split('base64,')[1] : image;
+    // Build request body for Gemini Pro Image API with all images
+    // Start with text prompt
+    const parts: any[] = [{ text: finalPrompt }];
 
-    // Build request body for Gemini Pro Image API
+    // Add all images to parts with detailed logging
+    console.log('Building request parts with images:');
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      const base64Data = img.includes('base64,') ? img.split('base64,')[1] : img;
+      const dataLength = base64Data?.length || 0;
+      const sizeKB = Math.round(dataLength * 0.75 / 1024);
+      console.log(`  [Part ${i + 1}] inline_data: mime_type=image/png, data_length=${dataLength}, size=${sizeKB}KB`);
+      parts.push({
+        inline_data: {
+          mime_type: 'image/png',
+          data: base64Data
+        }
+      });
+    }
+    console.log('Total parts in request:', parts.length);
+
     const requestBody = {
       contents: [{
-        parts: [
-          { text: finalPrompt },
-          {
-            inline_data: {
-              mime_type: 'image/png',
-              data: base64Data
-            }
-          }
-        ]
+        parts: parts
       }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
@@ -278,7 +341,8 @@ export async function POST(request: NextRequest) {
     console.log('Request body prepared:', {
       prompt: finalPrompt.substring(0, 100) + '...',
       aspectRatio: ratio,
-      imageSize: quality
+      imageSize: quality,
+      imageCount: images.length
     });
 
     // Add API key as query parameter
