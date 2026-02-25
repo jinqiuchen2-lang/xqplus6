@@ -248,6 +248,12 @@ export default function Home() {
     const remainingSlots = 5 - uploadedImages.length;
     const filesToProcess = Math.min(files.length, remainingSlots);
 
+    // Check if already at max limit
+    if (remainingSlots <= 0) {
+      alert('最多只能上传5张图片');
+      return;
+    }
+
     // Calculate dynamic quota per image
     const targetSizePerImage = Math.floor(TOTAL_BUDGET / filesToProcess);
 
@@ -623,11 +629,11 @@ export default function Home() {
           <h2 className="module-title">1. 上传产品图片</h2>
           {/* Upload area with images displayed inside, centered */}
           <div
-            className={`upload-area ${uploadedImages.length >= 8 ? 'disabled' : ''}`}
+            className={`upload-area ${uploadedImages.length >= 5 ? 'disabled' : ''}`}
             onClick={(e) => {
               // Only trigger file input if clicking on the add button or empty area
-              if ((e.target as HTMLElement).closest('.add-button') || uploadedImages.length < 8) {
-                if (uploadedImages.length < 8) {
+              if ((e.target as HTMLElement).closest('.add-button') || uploadedImages.length < 5) {
+                if (uploadedImages.length < 5) {
                   fileInputRef.current?.click();
                 }
               }
@@ -685,7 +691,7 @@ export default function Home() {
                       </button>
                     </div>
                   ))}
-                  {uploadedImages.length < 8 && (
+                  {uploadedImages.length < 5 && (
                     <div
                       className="image-preview-item add-button"
                       onClick={(e) => {
@@ -957,12 +963,38 @@ export default function Home() {
                   </p>
                 </div>
               ) : currentGeneratedImage ? (
-                <img
-                  src={currentGeneratedImage}
-                  alt="生成的海报"
-                  style={{ maxHeight: '450px', cursor: 'pointer' }}
-                  onClick={() => openImageModal(currentGeneratedImage!)}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <img
+                    src={currentGeneratedImage}
+                    alt="生成的海报"
+                    style={{ maxHeight: '450px', cursor: 'pointer' }}
+                    onClick={() => openImageModal(currentGeneratedImage!)}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => downloadImage(currentGeneratedImage!, `generated-${Date.now()}.jpg`)}
+                    style={{
+                      padding: '8px 24px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#4366e0';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#5079FF';
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    下载图片
+                  </button>
+                </div>
               ) : (
                 <div className="placeholder">
                   <p>生成的海报将显示在这里</p>
