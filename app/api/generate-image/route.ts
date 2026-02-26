@@ -126,9 +126,13 @@ export async function POST(request: NextRequest) {
     console.log('Has URLs:', hasUrls);
     console.log('Has base64:', images.some((img: string) => img.startsWith('data:image')));
 
-    // Normalize all images to base64
+    // For KIE mode with URLs, skip normalization (use URLs directly)
+    // For other modes or base64 inputs, normalize to base64
     let normalizedImages: string[];
-    if (hasUrls) {
+    if (mode === 'kie' && hasUrls) {
+      console.log('KIE mode with URLs - skipping normalization, will use URLs directly');
+      normalizedImages = images; // Keep as URLs for KIE mode
+    } else if (hasUrls) {
       console.log('Normalizing URL images to base64...');
       normalizedImages = await Promise.all(images.map((img: string) => normalizeImageInput(img)));
       console.log('All images normalized to base64');
@@ -277,6 +281,7 @@ export async function POST(request: NextRequest) {
       console.log('Number of images:', images.length);
       console.log('KIE API URL:', KIE_API_URL);
       console.log('Model:', KIE_MODEL);
+      console.log('Image sources:', hasUrls ? 'URLs (from frontend upload)' : 'base64 (will upload to KIE)');
 
       // Check if images are already KIE URLs (uploaded from frontend)
       // or if they need to be uploaded to KIE storage
@@ -285,7 +290,8 @@ export async function POST(request: NextRequest) {
       if (hasUrls) {
         // Frontend already uploaded to KIE, use the URLs directly
         imageUrls = images;
-        console.log('Using pre-uploaded KIE URLs:', imageUrls);
+        console.log('Using pre-uploaded KIE URLs:');
+        imageUrls.forEach((url, i) => console.log(`  [${i + 1}] ${url.substring(0, 60)}...`));
       } else {
         // Frontend sent base64, upload to KIE storage via server-side proxy
         console.log('Uploading base64 images to KIE storage...');
@@ -295,6 +301,8 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < maxImages; i++) {
           const base64Data = normalizedImages[i];
           const filename = `kie-upload-${Date.now()}-${i}.png`;
+
+          console.log(`  Uploading image ${i + 1}/${maxImages}...`);
 
           try {
             // Upload to KIE file storage
@@ -314,20 +322,23 @@ export async function POST(request: NextRequest) {
 
             if (!uploadResponse.ok) {
               const errorText = await uploadResponse.text();
-              console.error('KIE Upload Error:', errorText);
-              throw new Error(`KIE上传失败: ${uploadResponse.status}`);
+              console.error('KIE Upload Error Status:', uploadResponse.status);
+              console.error('KIE Upload Error Body:', errorText);
+              throw new Error(`KIE上传失败: ${uploadResponse.status} - ${errorText}`);
             }
 
             const uploadData = await uploadResponse.json();
+            console.log('KIE Upload response:', JSON.stringify(uploadData, null, 2));
+
             const url = uploadData.url || uploadData.data?.url || uploadData.fileUrl;
 
             if (!url) {
-              console.error('KIE Upload response:', uploadData);
+              console.error('KIE Upload response data:', uploadData);
               throw new Error('KIE未返回图片URL');
             }
 
             imageUrls.push(url);
-            console.log(`Image ${i + 1} uploaded to KIE: ${url}`);
+            console.log(`  Image ${i + 1} uploaded to KIE: ${url}`);
           } catch (uploadError) {
             console.error(`Failed to upload image ${i + 1}:`, uploadError);
             throw new Error(`图片上传失败: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
@@ -359,7 +370,7 @@ export async function POST(request: NextRequest) {
         prompt: fullPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
         resolution: resolutionMap[quality] || '2K',
-        image_urls: imageUrls
+        image_count: imageUrls.length
       });
 
       // Add timeout controller for KIE API (30 seconds for task creation)
