@@ -580,6 +580,48 @@ export default function Home() {
     const constraint = currentPrompt?.constraint || '';
 
     try {
+      // For KIE mode, upload images to KIE first to bypass Vercel's 4.5MB limit
+      let imagesToSend: string[];
+
+      if (selectedMode === 'kie') {
+        console.log('=== KIE Mode: Uploading images to KIE storage ===');
+        const kieUrls: string[] = [];
+
+        for (let i = 0; i < uploadedImages.length; i++) {
+          const img = uploadedImages[i];
+          console.log(`Uploading image ${i + 1}/${uploadedImages.length} to KIE...`);
+
+          try {
+            const uploadResponse = await fetch('/api/upload-to-kie', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                base64Data: img.dataUrl,
+                fileName: `upload-${Date.now()}-${i}.png`,
+              }),
+            });
+
+            if (!uploadResponse.ok) {
+              const errorData = await uploadResponse.json();
+              throw new Error(errorData.error || '上传到KIE失败');
+            }
+
+            const uploadData = await uploadResponse.json();
+            kieUrls.push(uploadData.url);
+            console.log(`Image ${i + 1} uploaded to KIE: ${uploadData.url}`);
+          } catch (error) {
+            console.error(`Failed to upload image ${i + 1} to KIE:`, error);
+            throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+          }
+        }
+
+        imagesToSend = kieUrls;
+        console.log('All images uploaded to KIE, URLs:', kieUrls);
+      } else {
+        // For other modes, send base64 data directly
+        imagesToSend = uploadedImages.map((img) => img.dataUrl);
+      }
+
       // Create timeout controller (5 minutes)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
@@ -589,7 +631,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: uploadedImages.map((img) => img.dataUrl),
+          images: imagesToSend,
           prompt: currentEditedPrompt,
           constraint: constraint, // Send constraint to backend
           ratio: selectedRatio,

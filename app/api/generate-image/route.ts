@@ -65,6 +65,34 @@ function createFormDataWithImages(
   return { body, contentType };
 }
 
+// Helper function to download image from URL and convert to base64
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+  }
+  const buffer = await response.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString('base64');
+
+  // Detect content type from response or default to png
+  const contentType = response.headers.get('content-type') || 'image/png';
+  return `data:${contentType};base64,${base64}`;
+}
+
+// Helper function to normalize image input (URL or base64)
+async function normalizeImageInput(image: string): Promise<string> {
+  // If it's already base64 data, return as-is
+  if (image.startsWith('data:image')) {
+    return image;
+  }
+  // If it's a URL, fetch and convert to base64
+  if (image.startsWith('http://') || image.startsWith('https://')) {
+    console.log('Fetching image from URL:', image.substring(0, 50) + '...');
+    return await fetchImageAsBase64(image);
+  }
+  throw new Error('Invalid image input: must be base64 data or URL');
+}
+
 export async function POST(request: NextRequest) {
   // Set a longer timeout for this route (5 minutes)
   // Note: This requires the Next.js server to support timeout configuration
@@ -93,17 +121,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log detailed image information
-    console.log('=== Image Upload Verification ===');
-    console.log('Total images received:', images.length);
-    images.forEach((img: string, index: number) => {
-      const hasBase64Prefix = img.includes('base64,');
-      const base64Part = hasBase64Prefix ? img.split('base64,')[1] : img;
-      const dataLength = base64Part?.length || 0;
-      const estimatedSizeKB = Math.round(dataLength * 0.75 / 1024); // base64 is ~4/3 of original
-      const mimeType = img.match(/data:image\/([^;]+)/)?.[1] || 'unknown';
-      console.log(`  Image ${index}: mimeType=${mimeType}, base64Length=${dataLength}, estimatedSize=${estimatedSizeKB}KB`);
-    });
+    // Detect if images are URLs or base64
+    const hasUrls = images.some((img: string) => img.startsWith('http://') || img.startsWith('https://'));
+    console.log('=== Image Input Type ===');
+    console.log('Has URLs:', hasUrls);
+    console.log('Has base64:', images.some((img: string) => img.startsWith('data:image')));
+
+    // Normalize all images to base64
+    let normalizedImages: string[];
+    if (hasUrls) {
+      console.log('Normalizing URL images to base64...');
+      normalizedImages = await Promise.all(images.map((img: string) => normalizeImageInput(img)));
+      console.log('All images normalized to base64');
+    } else {
+      normalizedImages = images;
+      // Log detailed image information for base64 inputs
+      console.log('=== Image Upload Verification ===');
+      console.log('Total images received:', images.length);
+      images.forEach((img: string, index: number) => {
+        const hasBase64Prefix = img.includes('base64,');
+        const base64Part = hasBase64Prefix ? img.split('base64,')[1] : img;
+        const dataLength = base64Part?.length || 0;
+        const estimatedSizeKB = Math.round(dataLength * 0.75 / 1024);
+        const mimeType = img.match(/data:image\/([^;]+)/)?.[1] || 'unknown';
+        console.log(`  Image ${index}: mimeType=${mimeType}, base64Length=${dataLength}, estimatedSize=${estimatedSizeKB}KB`);
+      });
+    }
 
     // Combine constraint with prompt if provided
     const fullPrompt = constraint ? `${constraint}\n\n${prompt}` : prompt;
@@ -132,7 +175,7 @@ export async function POST(request: NextRequest) {
       console.log('Model:', PROXY_MODEL);
 
       // Convert all base64 images to buffers with detailed logging
-      const imageBuffers = images.map((img: string, index: number) => {
+      const imageBuffers = normalizedImages.map((img: string, index: number) => {
         const base64Data = img.includes('base64,') ? img.split('base64,')[1] : img;
         const buffer = Buffer.from(base64Data, 'base64');
         const sizeKB = Math.round(buffer.length / 1024);
@@ -249,10 +292,10 @@ export async function POST(request: NextRequest) {
       // KIE API requires image URLs, not base64 data
       // Upload all images to Vercel Blob Storage and get public URLs
       const imageUrls: string[] = [];
-      const maxImages = Math.min(images.length, 8); // KIE API supports up to 8 images
+      const maxImages = Math.min(normalizedImages.length, 8); // KIE API supports up to 8 images
 
       for (let i = 0; i < maxImages; i++) {
-        const base64Data = images[i].includes('base64,') ? images[i].split('base64,')[1] : images[i];
+        const base64Data = normalizedImages[i].includes('base64,') ? normalizedImages[i].split('base64,')[1] : normalizedImages[i];
         const buffer = Buffer.from(base64Data, 'base64');
         const filename = `kie-upload-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.png`;
 
@@ -365,7 +408,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Full vision analysis for product fidelity
     console.log('=== Step 1: Vision Analysis ===');
-    console.log('Number of images for analysis:', images.length);
+    console.log('Number of images for analysis:', normalizedImages.length);
     console.log('Input prompt with constraint:', fullPrompt.substring(0, 300) + '...');
     let finalPrompt = fullPrompt;
 
@@ -375,7 +418,7 @@ export async function POST(request: NextRequest) {
     let analysisSuccess = false;
     try {
       // Build messages with all images for analysis
-      const imageContents = images.map((img: string, index: number) => {
+      const imageContents = normalizedImages.map((img: string, index: number) => {
         const urlPreview = img.length > 50 ? img.substring(0, 50) + '...' : img;
         console.log(`  [Analysis Image ${index}] ${urlPreview}`);
         return {
@@ -422,7 +465,7 @@ export async function POST(request: NextRequest) {
               content: [
                 {
                   type: 'text',
-                  text: `请分析这些产品图片（共${images.length}张），并基于以下用户提示词生成英文增强版提示词（直接输出英文提示词，不要包含其他内容）：\n\n${fullPrompt}`
+                  text: `请分析这些产品图片（共${normalizedImages.length}张），并基于以下用户提示词生成英文增强版提示词（直接输出英文提示词，不要包含其他内容）：\n\n${fullPrompt}`
                 },
                 ...imageContents
               ]
@@ -473,7 +516,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Generate image using Gemini Pro Image API
     console.log('=== Step 2: Image Generation ===');
     console.log('Final prompt being used:', finalPrompt.substring(0, 200) + '...');
-    console.log('Number of reference images:', images.length);
+    console.log('Number of reference images:', normalizedImages.length);
     console.log('Aspect Ratio:', ratio);
     console.log('Image Size:', quality);
 
@@ -483,8 +526,8 @@ export async function POST(request: NextRequest) {
 
     // Add all images to parts with detailed logging
     console.log('Building request parts with images:');
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i];
+    for (let i = 0; i < normalizedImages.length; i++) {
+      const img = normalizedImages[i];
       const base64Data = img.includes('base64,') ? img.split('base64,')[1] : img;
       const dataLength = base64Data?.length || 0;
       const sizeKB = Math.round(dataLength * 0.75 / 1024);
