@@ -28,9 +28,7 @@ interface UploadedImage {
 const TABS = [
   { id: 'main_kv', name: '主KV视觉' },
   { id: 'usage_scenario', name: '使用场景' },
-  { id: 'bazi_chart', name: '八字排盘' },
-  { id: 'five_elements', name: '五行分析' },
-  { id: 'ten_gods', name: '十神分布' },
+  { id: 'craft_visualization', name: '工艺概念可视化' },
   { id: 'detail_closeup', name: '细节特写' },
   { id: 'texture_closeup', name: '质感特写' },
   { id: 'functional_detail', name: '功能细节' },
