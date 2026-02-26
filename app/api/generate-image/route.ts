@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
@@ -275,41 +274,64 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if BLOB_READ_WRITE_TOKEN is configured for image upload
-      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-      if (!blobToken) {
-        console.error('BLOB_READ_WRITE_TOKEN is not configured');
-        return NextResponse.json(
-          { error: 'KIE模式需要配置图片上传服务（BLOB_READ_WRITE_TOKEN）' },
-          { status: 503 }
-        );
-      }
-
-      console.log('Number of images to upload:', images.length);
+      console.log('Number of images:', images.length);
       console.log('KIE API URL:', KIE_API_URL);
       console.log('Model:', KIE_MODEL);
 
-      // KIE API requires image URLs, not base64 data
-      // Upload all images to Vercel Blob Storage and get public URLs
-      const imageUrls: string[] = [];
-      const maxImages = Math.min(normalizedImages.length, 8); // KIE API supports up to 8 images
+      // Check if images are already KIE URLs (uploaded from frontend)
+      // or if they need to be uploaded to KIE storage
+      let imageUrls: string[];
 
-      for (let i = 0; i < maxImages; i++) {
-        const base64Data = normalizedImages[i].includes('base64,') ? normalizedImages[i].split('base64,')[1] : normalizedImages[i];
-        const buffer = Buffer.from(base64Data, 'base64');
-        const filename = `kie-upload-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.png`;
+      if (hasUrls) {
+        // Frontend already uploaded to KIE, use the URLs directly
+        imageUrls = images;
+        console.log('Using pre-uploaded KIE URLs:', imageUrls);
+      } else {
+        // Frontend sent base64, upload to KIE storage via server-side proxy
+        console.log('Uploading base64 images to KIE storage...');
+        imageUrls = [];
+        const maxImages = Math.min(normalizedImages.length, 8); // KIE API supports up to 8 images
 
-        console.log(`Uploading image ${i + 1}/${maxImages}: ${filename}, size=${buffer.length} bytes`);
+        for (let i = 0; i < maxImages; i++) {
+          const base64Data = normalizedImages[i];
+          const filename = `kie-upload-${Date.now()}-${i}.png`;
 
-        try {
-          const blob = await put(filename, buffer, {
-            access: 'public',
-          });
-          imageUrls.push(blob.url);
-          console.log(`Image ${i + 1} uploaded successfully: ${blob.url}`);
-        } catch (uploadError) {
-          console.error(`Failed to upload image ${i + 1}:`, uploadError);
-          throw new Error(`图片上传失败: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+          try {
+            // Upload to KIE file storage
+            const uploadResponse = await fetch('https://kieai.redpandaai.co/api/file-base64-upload', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${KIE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                base64Data,
+                uploadPath: 'images/base64',
+                fileName: filename,
+              }),
+            });
+
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              console.error('KIE Upload Error:', errorText);
+              throw new Error(`KIE上传失败: ${uploadResponse.status}`);
+            }
+
+            const uploadData = await uploadResponse.json();
+            const url = uploadData.url || uploadData.data?.url || uploadData.fileUrl;
+
+            if (!url) {
+              console.error('KIE Upload response:', uploadData);
+              throw new Error('KIE未返回图片URL');
+            }
+
+            imageUrls.push(url);
+            console.log(`Image ${i + 1} uploaded to KIE: ${url}`);
+          } catch (uploadError) {
+            console.error(`Failed to upload image ${i + 1}:`, uploadError);
+            throw new Error(`图片上传失败: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+          }
         }
       }
 
@@ -325,7 +347,7 @@ export async function POST(request: NextRequest) {
         model: KIE_MODEL,
         input: {
           prompt: fullPrompt,
-          image_input: imageUrls, // Use uploaded image URLs
+          image_input: imageUrls, // Use KIE image URLs
           aspect_ratio: ratio,
           resolution: resolutionMap[quality] || '2K',
           output_format: 'png'
