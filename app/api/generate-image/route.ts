@@ -330,7 +330,13 @@ export async function POST(request: NextRequest) {
             const uploadData = await uploadResponse.json();
             console.log('KIE Upload response:', JSON.stringify(uploadData, null, 2));
 
-            const url = uploadData.url || uploadData.data?.url || uploadData.fileUrl;
+            // KIE API returns URL in various formats, check all possible locations
+            const url = uploadData.url ||
+                        uploadData.downloadUrl ||
+                        uploadData.fileUrl ||
+                        uploadData.data?.url ||
+                        uploadData.data?.downloadUrl ||
+                        uploadData.data?.fileUrl;
 
             if (!url) {
               console.error('KIE Upload response data:', uploadData);

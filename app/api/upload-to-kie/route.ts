@@ -50,8 +50,13 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     console.log('KIE Upload response:', JSON.stringify(data, null, 2));
 
-    // Extract the URL from KIE response
-    const imageUrl = data.url || data.data?.url || data.fileUrl;
+    // Extract the URL from KIE response - check all possible locations
+    const imageUrl = data.url ||
+                     data.downloadUrl ||
+                     data.fileUrl ||
+                     data.data?.url ||
+                     data.data?.downloadUrl ||
+                     data.data?.fileUrl;
 
     if (!imageUrl) {
       console.error('KIE Upload response data:', data);
