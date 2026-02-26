@@ -11,6 +11,11 @@ const PROXY_API_URL = process.env.PROXY_API_URL || 'https://ai.comfly.chat';
 const PROXY_API_KEY = process.env.PROXY_API_KEY || 'sk-BBUADo4NEY066P3Q7PKJh2g4y3pP6CPy3hNFBt7cQqwBMVma';
 const PROXY_MODEL = process.env.PROXY_MODEL || 'nano-banana-2';
 
+// KIE mode configuration
+const KIE_API_URL = process.env.KIE_API_URL || 'https://api.kie.ai';
+const KIE_API_KEY = process.env.KIE_API_KEY || '';
+const KIE_MODEL = process.env.KIE_MODEL || 'nano-banana-pro';
+
 // Helper function to create multipart/form-data body with multiple images
 // Uses indexed field names (image[0], image[1], etc.) for proper multi-image support
 function createFormDataWithImages(
@@ -193,6 +198,99 @@ export async function POST(request: NextRequest) {
         success: true,
         imageUrl,
         message: '图片生成成功（中转模式）'
+      });
+    }
+
+    // KIE mode: use the nano-banana-pro API via KIE
+    if (mode === 'kie') {
+      console.log('=== KIE MODE: nano-banana-pro ===');
+      console.log('Number of images to send:', images.length);
+      console.log('KIE API URL:', KIE_API_URL);
+      console.log('Model:', KIE_MODEL);
+
+      // Prepare image_input array (supports up to 8 images)
+      const imageInput = images.slice(0, 8).map((img: string) => {
+        // KIE API expects base64 data URLs
+        return img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+      });
+
+      // Map quality to KIE API resolution
+      const resolutionMap: Record<string, string> = {
+        '1K': '1K',
+        '2K': '2K',
+        '4K': '4K'
+      };
+
+      // Create task request body
+      const requestBody = {
+        model: KIE_MODEL,
+        input: {
+          prompt: fullPrompt,
+          image_input: imageInput,
+          aspect_ratio: ratio,
+          resolution: resolutionMap[quality] || '2K',
+          output_format: 'png'
+        }
+      };
+
+      console.log('KIE API request:', {
+        model: KIE_MODEL,
+        prompt: fullPrompt.substring(0, 100) + '...',
+        aspect_ratio: ratio,
+        resolution: resolutionMap[quality] || '2K',
+        image_count: imageInput.length
+      });
+
+      // Add timeout controller for KIE API (30 seconds for task creation)
+      const kieController = new AbortController();
+      const kieTimeoutId = setTimeout(() => kieController.abort(), 30000);
+
+      let kieResponse: Response;
+      try {
+        kieResponse = await fetch(`${KIE_API_URL}/api/v1/jobs/createTask`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${KIE_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody),
+          signal: kieController.signal,
+        });
+        clearTimeout(kieTimeoutId);
+      } catch (fetchError: any) {
+        clearTimeout(kieTimeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('KIE API request timed out after 30 seconds');
+          throw new Error('KIE API请求超时，请稍后重试');
+        }
+        throw fetchError;
+      }
+
+      if (!kieResponse.ok) {
+        const errorText = await kieResponse.text();
+        console.error('KIE API Error Status:', kieResponse.status);
+        console.error('KIE API Error Body:', errorText);
+        throw new Error(`KIE API调用失败: ${kieResponse.status} - ${errorText}`);
+      }
+
+      const kieData = await kieResponse.json();
+      console.log('KIE API response:', JSON.stringify(kieData, null, 2));
+
+      // Extract taskId from response
+      const taskId = kieData.data?.taskId;
+
+      if (!taskId) {
+        console.error('KIE response data:', kieData);
+        throw new Error('KIE API未返回任务ID');
+      }
+
+      console.log('KIE mode task created successfully, taskId:', taskId);
+
+      // Return taskId for frontend to poll
+      return NextResponse.json({
+        success: true,
+        taskId,
+        message: '任务已创建，正在生成中...'
       });
     }
 

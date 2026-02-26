@@ -40,6 +40,7 @@ const QUALITIES = ['1K', '2K', '4K'];
 const MODES = [
   { id: 'official', name: '官方模式' },
   { id: 'proxy', name: '中转模式' },
+  { id: 'kie', name: 'Kie模式' },
 ];
 
 // Storage keys
@@ -503,6 +504,63 @@ export default function Home() {
     setEditedPrompts({ ...editedPrompts, [activeTab]: value });
   };
 
+  // Poll KIE task status
+  const pollKieTaskStatus = async (taskId: string, promptText: string) => {
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
+        if (!response.ok) {
+          throw new Error('查询任务状态失败');
+        }
+
+        const data = await response.json();
+        const { state, resultJson, failMsg } = data;
+
+        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
+
+        if (state === 'success') {
+          const result = JSON.parse(resultJson);
+          const imageUrl = result.resultUrls?.[0];
+
+          if (!imageUrl) {
+            throw new Error('未收到图片URL');
+          }
+
+          // Display the generated image
+          setCurrentGeneratedImage(imageUrl);
+          setIsGeneratingImage(false);
+
+          // Add to history
+          const newHistoryItem: GeneratedImage = {
+            id: Date.now().toString(),
+            url: imageUrl,
+            prompt: promptText,
+            date: new Date().toLocaleString('zh-CN'),
+            posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
+          };
+          const newHistory = [newHistoryItem, ...history].slice(0, MAX_HISTORY_ITEMS);
+          setHistory(newHistory);
+          return;
+        }
+
+        if (state === 'fail') {
+          throw new Error(failMsg || '图片生成失败');
+        }
+
+        // Still processing, wait before next poll
+        await new Promise(resolve => setTimeout(resolve, interval));
+      } catch (error) {
+        console.error('Error polling KIE task status:', error);
+        throw error;
+      }
+    }
+
+    throw new Error('任务超时，请稍后重试');
+  };
+
   const generateImage = async () => {
     if (uploadedImages.length === 0) {
       alert('请先上传图片');
@@ -550,6 +608,14 @@ export default function Home() {
 
       const data = await response.json();
 
+      // Handle KIE mode (async task)
+      if (selectedMode === 'kie' && data.taskId) {
+        // Poll for task completion
+        await pollKieTaskStatus(data.taskId, currentEditedPrompt);
+        return;
+      }
+
+      // Handle direct image URL response (official and proxy modes)
       if (!data.imageUrl) {
         throw new Error('未收到图片URL');
       }

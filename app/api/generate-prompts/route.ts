@@ -53,7 +53,7 @@ const PROMPT_SPECS = [
     type: 'color_inspiration',
     posterId: '海报07',
     posterStyle: '配色灵感',
-    instruction: `配色灵感（需要详细排版布局说明）`
+    instruction: `配色灵感（需要详细排版布局说明，重要：画面中不要展示英文字母和色号数字，只展示产品、配色色块和简短中文描述）`
   }
 ];
 
