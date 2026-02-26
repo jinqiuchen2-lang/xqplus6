@@ -15,6 +15,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check if KIE API key is configured
+    if (!KIE_API_KEY || KIE_API_KEY === '') {
+      console.error('KIE API key is not configured');
+      return NextResponse.json(
+        { error: 'KIE模式暂不可用' },
+        { status: 503 }
+      );
+    }
+
     console.log('=== Checking KIE Task Status ===');
     console.log('TaskId:', taskId);
 

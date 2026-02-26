@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.API_KEY;
@@ -70,6 +71,14 @@ export async function POST(request: NextRequest) {
   try {
     const { images, prompt, ratio = '1:1', quality = '2K', constraint, mode = 'official' } = await request.json();
 
+    console.log('=== Generate Image Request ===');
+    console.log('Mode:', mode);
+    console.log('Images count:', images?.length);
+    console.log('Ratio:', ratio);
+    console.log('Quality:', quality);
+    console.log('KIE_API_KEY exists:', !!KIE_API_KEY);
+    console.log('KIE_API_KEY length:', KIE_API_KEY?.length);
+
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
         { error: '请提供图片' },
@@ -105,6 +114,15 @@ export async function POST(request: NextRequest) {
     console.log('Quality:', quality);
     console.log('Prompt length:', fullPrompt.length);
     console.log('Constraint:', constraint ? 'YES' : 'NO');
+
+    // Validate mode
+    const validModes = ['official', 'proxy', 'kie'];
+    if (!validModes.includes(mode)) {
+      return NextResponse.json(
+        { error: `无效的模式: ${mode}` },
+        { status: 400 }
+      );
+    }
 
     // Proxy mode: use the nano-banana-2 API directly
     if (mode === 'proxy') {
@@ -204,15 +222,53 @@ export async function POST(request: NextRequest) {
     // KIE mode: use the nano-banana-pro API via KIE
     if (mode === 'kie') {
       console.log('=== KIE MODE: nano-banana-pro ===');
-      console.log('Number of images to send:', images.length);
+
+      // Check if KIE API key is configured
+      if (!KIE_API_KEY || KIE_API_KEY === '') {
+        console.error('KIE API key is not configured');
+        return NextResponse.json(
+          { error: 'KIE模式暂不可用，请使用其他模式' },
+          { status: 503 }
+        );
+      }
+
+      // Check if BLOB_READ_WRITE_TOKEN is configured for image upload
+      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (!blobToken) {
+        console.error('BLOB_READ_WRITE_TOKEN is not configured');
+        return NextResponse.json(
+          { error: 'KIE模式需要配置图片上传服务（BLOB_READ_WRITE_TOKEN）' },
+          { status: 503 }
+        );
+      }
+
+      console.log('Number of images to upload:', images.length);
       console.log('KIE API URL:', KIE_API_URL);
       console.log('Model:', KIE_MODEL);
 
-      // Prepare image_input array (supports up to 8 images)
-      const imageInput = images.slice(0, 8).map((img: string) => {
-        // KIE API expects base64 data URLs
-        return img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
-      });
+      // KIE API requires image URLs, not base64 data
+      // Upload all images to Vercel Blob Storage and get public URLs
+      const imageUrls: string[] = [];
+      const maxImages = Math.min(images.length, 8); // KIE API supports up to 8 images
+
+      for (let i = 0; i < maxImages; i++) {
+        const base64Data = images[i].includes('base64,') ? images[i].split('base64,')[1] : images[i];
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filename = `kie-upload-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.png`;
+
+        console.log(`Uploading image ${i + 1}/${maxImages}: ${filename}, size=${buffer.length} bytes`);
+
+        try {
+          const blob = await put(filename, buffer, {
+            access: 'public',
+          });
+          imageUrls.push(blob.url);
+          console.log(`Image ${i + 1} uploaded successfully: ${blob.url}`);
+        } catch (uploadError) {
+          console.error(`Failed to upload image ${i + 1}:`, uploadError);
+          throw new Error(`图片上传失败: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+        }
+      }
 
       // Map quality to KIE API resolution
       const resolutionMap: Record<string, string> = {
@@ -221,12 +277,12 @@ export async function POST(request: NextRequest) {
         '4K': '4K'
       };
 
-      // Create task request body
+      // Create task request body with image URLs
       const requestBody = {
         model: KIE_MODEL,
         input: {
           prompt: fullPrompt,
-          image_input: imageInput,
+          image_input: imageUrls, // Use uploaded image URLs
           aspect_ratio: ratio,
           resolution: resolutionMap[quality] || '2K',
           output_format: 'png'
@@ -238,7 +294,7 @@ export async function POST(request: NextRequest) {
         prompt: fullPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
         resolution: resolutionMap[quality] || '2K',
-        image_count: imageInput.length
+        image_urls: imageUrls
       });
 
       // Add timeout controller for KIE API (30 seconds for task creation)
@@ -277,6 +333,7 @@ export async function POST(request: NextRequest) {
       console.log('KIE API response:', JSON.stringify(kieData, null, 2));
 
       // Extract taskId from response
+      // KIE API response format: { code: 200, msg: "success", data: { taskId: "..." } }
       const taskId = kieData.data?.taskId;
 
       if (!taskId) {
