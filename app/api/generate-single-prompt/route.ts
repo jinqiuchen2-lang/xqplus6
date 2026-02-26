@@ -5,7 +5,7 @@ const API_KEY = process.env.API_KEY;
 const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
 const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
 
-// Prompt specifications for the 7 poster types
+// Prompt specifications for the 9 poster types
 const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle: string; instruction: string }> = {
   main_kv: {
     name: '主KV视觉',
@@ -19,33 +19,45 @@ const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle
     posterStyle: 'Lifestyle',
     instruction: `使用场景（Lifestyle，展示产品实际使用场景，必须严格还原产品图，不可出现裸体）`,
   },
-  craft_visualization: {
-    name: '工艺概念可视化',
+  bazi_chart: {
+    name: '八字排盘',
     posterId: '海报03',
-    posterStyle: 'Process/Concept',
-    instruction: `工艺概念可视化（Process/Concept，必须严格还原产品图，需要详细排版布局说明）`,
+    posterStyle: '八字排盘',
+    instruction: `八字排盘（需要详细排版布局说明，展示生辰八字四柱、命盘图表等传统元素）`,
+  },
+  five_elements: {
+    name: '五行分析',
+    posterId: '海报04',
+    posterStyle: '五行分析',
+    instruction: `五行分析（需要详细排版布局说明，展示金木水火土五行分布、相生相克关系等）`,
+  },
+  ten_gods: {
+    name: '十神分布',
+    posterId: '海报05',
+    posterStyle: '十神分布',
+    instruction: `十神分布（需要详细排版布局说明，展示十神配置、命格分析等内容）`,
   },
   detail_closeup: {
     name: '细节特写',
-    posterId: '海报04',
+    posterId: '海报06',
     posterStyle: 'Detail 01',
     instruction: `细节特写（Detail 01，设计亮点）`,
   },
   texture_closeup: {
     name: '质感特写',
-    posterId: '海报05',
+    posterId: '海报07',
     posterStyle: 'Detail 02',
     instruction: `质感特写（Detail 02，材质/质感特写，使用微距+掠射光）`,
   },
   functional_detail: {
     name: '功能细节',
-    posterId: '海报06',
+    posterId: '海报08',
     posterStyle: 'Detail 03',
     instruction: `功能细节（Detail 03，功能细节）`,
   },
   color_inspiration: {
     name: '配色灵感',
-    posterId: '海报07',
+    posterId: '海报09',
     posterStyle: '配色灵感',
     instruction: `配色灵感（需要详细排版布局说明，重要：画面中不要展示英文字母和色号数字，只展示产品、配色色块和简短中文描述）`,
   },
@@ -137,7 +149,7 @@ Step 4: Generate Complete Prompt (System Refined)
 
 排版布局：
 - 对于"主KV视觉"、"使用场景"、"细节特写"、"质感特写"、"功能细节"类型，排版布局为可选项（AI根据画面需要决定是否添加）
-- 对于"工艺概念可视化"和"配色灵感"类型，排版布局为必填项，必须按照以下格式输出：
+- 对于"八字排盘"、"五行分析"、"十神分布"、"配色灵感"类型，排版布局为必填项，必须按照以下格式输出：
 
 排版布局示例：
 顶部居中：
