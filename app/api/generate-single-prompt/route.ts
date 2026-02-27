@@ -325,21 +325,35 @@ export async function POST(request: NextRequest) {
       chinesePrompt = chineseMatch[1].trim();
     }
 
-    // Extract layout section from the chinesePrompt content
-    // Look for "排版布局：" followed by content until end or ###
-    const layoutMatch = chinesePrompt.match(/排版布局[：:]\s*([\s\S]*?)(?=$|###|$)/);
+    // Extract layout section - try multiple patterns for robustness
+    // Pattern 1: Look for "排版布局：" in chinesePrompt
+    let layoutMatch = chinesePrompt.match(/排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
+    if (!layoutMatch) {
+      // Pattern 2: Look for "排版布局：" in full content (after 中文提示词)
+      layoutMatch = content.match(/中文提示词[：:][\s\S]*?排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
+    }
+    if (!layoutMatch) {
+      // Pattern 3: Look for layout content more broadly
+      layoutMatch = content.match(/排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
+    }
+
     if (layoutMatch) {
       layout = layoutMatch[1].trim();
-      // Remove layout from chinesePrompt to avoid duplication
-      chinesePrompt = chinesePrompt.replace(/排版布局[：:]\s*[\s\S]*?(?=$|###|$)/, '').trim();
+      console.log(`Layout found for ${spec.name}, length: ${layout.length}`);
+    } else {
+      console.log(`No layout found for ${spec.name}`);
     }
+
+    // Remove layout from chinesePrompt if it's there (to avoid duplication when we re-append)
+    chinesePrompt = chinesePrompt.replace(/排版布局[：:]\s*[\s\S]*?(?=$|负面词|###|$)/, '').trim();
 
     // If still empty, use the whole content as prompt
     if (!chinesePrompt) {
       chinesePrompt = content;
     }
 
-    // Append formatted layout to chinesePrompt if it exists
+    // Always append formatted layout to chinesePrompt at the end
+    // This ensures layout is visible in the editable prompt area
     if (layout) {
       chinesePrompt = chinesePrompt + '\n\n【排版布局】\n' + layout;
     }
