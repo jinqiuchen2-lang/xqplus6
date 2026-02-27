@@ -320,21 +320,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract Chinese prompt (includes everything after 中文提示词)
-    const chineseMatch = content.match(/中文提示词[：:]\s*([\s\S]*?)(?=$)/);
+    // First, clean the content to remove metadata sections
+    let cleanedContent = content;
+
+    // Remove 【识别报告】section
+    cleanedContent = cleanedContent.replace(/【识别报告】[\s\S]*?【视觉约束立法】/, '');
+
+    // Remove 【视觉约束立法】section
+    cleanedContent = cleanedContent.replace(/【视觉约束立法\/\s*Visual Constraints】[\s\S]*?(?=###|中文提示词|$)/, '');
+
+    // Remove [CRITICAL CONSTRAINT] block
+    cleanedContent = cleanedContent.replace(/\[CRITICAL CONSTRAINT[^\]]*\][\s\S]*?\[END CONSTRAINT\]/, '');
+
+    // Remove "### 海报XX | ..." title lines
+    cleanedContent = cleanedContent.replace(/### [^\n]+\n/, '');
+
+    // Remove "Prompt (English):" label
+    cleanedContent = cleanedContent.replace(/Prompt \(English\):[\s\n]*/i, '');
+
+    // Now extract Chinese prompt from cleaned content
+    const chineseMatch = cleanedContent.match(/中文提示词[：:]\s*([\s\S]*?)(?=$)/);
     if (chineseMatch) {
       chinesePrompt = chineseMatch[1].trim();
     }
 
+    // Remove "负面词" section if present
+    chinesePrompt = chinesePrompt.replace(/负面词[：:]\s*[\s\S]*?(?=$)/, '').trim();
+
     // Extract layout section - try multiple patterns for robustness
-    // Pattern 1: Look for "排版布局：" in chinesePrompt
     let layoutMatch = chinesePrompt.match(/排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
     if (!layoutMatch) {
-      // Pattern 2: Look for "排版布局：" in full content (after 中文提示词)
-      layoutMatch = content.match(/中文提示词[：:][\s\S]*?排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
-    }
-    if (!layoutMatch) {
-      // Pattern 3: Look for layout content more broadly
-      layoutMatch = content.match(/排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
+      layoutMatch = cleanedContent.match(/排版布局[：:]\s*([\s\S]*?)(?=$|负面词|###|$)/);
     }
 
     if (layoutMatch) {
@@ -347,13 +363,16 @@ export async function POST(request: NextRequest) {
     // Remove layout from chinesePrompt if it's there (to avoid duplication when we re-append)
     chinesePrompt = chinesePrompt.replace(/排版布局[：:]\s*[\s\S]*?(?=$|负面词|###|$)/, '').trim();
 
-    // If still empty, use the whole content as prompt
-    if (!chinesePrompt) {
-      chinesePrompt = content;
+    // If still empty, try to extract main content without metadata
+    if (!chinesePrompt || chinesePrompt.length < 10) {
+      const mainContentMatch = content.match(/\[END CONSTRAINT\][\s\S]*?(?=负面词|$)/);
+      if (mainContentMatch) {
+        chinesePrompt = mainContentMatch[1].trim();
+      }
     }
 
     // Always append formatted layout to chinesePrompt at the end
-    // This ensures layout is visible in the editable prompt area
+    // Layout content must be in Chinese only
     if (layout) {
       chinesePrompt = chinesePrompt + '\n\n【排版布局】\n' + layout;
     }
