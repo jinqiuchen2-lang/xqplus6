@@ -47,7 +47,7 @@ const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle
     name: '配色灵感',
     posterId: '海报07',
     posterStyle: '配色灵感',
-    instruction: `配色灵感（需要详细排版布局说明，重要：画面中不要展示英文字母和色号数字，只展示产品、配色色块和简短中文描述）`,
+    instruction: `配色灵感（需要详细排版布局说明。重要：1. 画面中不要展示英文字母和色号数字，只展示产品、配色色块和简短中文描述。2. 排版布局中的所有文字内容必须是中文，包括标题、标签、卖点等）`,
   },
 };
 
@@ -151,6 +151,7 @@ Step 4: Generate Complete Prompt (System Refined)
 - 排版布局必须详细描述每个文字元素的位置、字体、颜色、大小
 - 标题和副标题要有明确的层次关系
 - 所有文字元素必须与产品风格保持一致
+- **排版布局中的所有文字内容必须是中文，如果需要使用品牌名或英文术语，必须同时提供中文翻译或说明**
 `;
 
 // Helper function to fetch with retry
