@@ -824,6 +824,58 @@ export default function Home() {
           if (!response.ok) {
             const errorData = await response.json();
             console.error(`Failed to generate ${tab.name}:`, errorData.error);
+
+            // If rate limited (429), wait and retry once
+            if (response.status === 429) {
+              console.log(`Rate limited for ${tab.name}, waiting 40 seconds before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 40000));
+
+              const retryController = new AbortController();
+              const retryTimeoutId = setTimeout(() => retryController.abort(), 300000);
+
+              const retryResponse = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  images: imagesToSend,
+                  prompt: prompt,
+                  constraint: constraint,
+                  ratio: selectedRatio,
+                  quality: selectedQuality,
+                  mode: selectedMode,
+                }),
+                signal: retryController.signal,
+              });
+
+              clearTimeout(retryTimeoutId);
+
+              if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+
+                if (selectedMode === 'kie' && retryData.taskId) {
+                  const result = await pollKieTaskStatusForResult(retryData.taskId, prompt);
+                  if (result) {
+                    results.push({
+                      tabId: tab.id,
+                      tabName: tab.name,
+                      url: result,
+                      prompt: prompt,
+                    });
+                  }
+                } else if (retryData.imageUrl) {
+                  results.push({
+                    tabId: tab.id,
+                    tabName: tab.name,
+                    url: retryData.imageUrl,
+                    prompt: prompt,
+                  });
+                }
+                setAllGeneratedImages([...results]);
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s before next request
+                continue;
+              }
+            }
+
             continue; // Skip this tab and continue with others
           }
 
@@ -853,6 +905,12 @@ export default function Home() {
 
           // Update results incrementally
           setAllGeneratedImages([...results]);
+
+          // Wait 5 seconds before next request to avoid rate limiting
+          if (tabsWithPrompts.indexOf(tab) < tabsWithPrompts.length - 1) {
+            console.log('Waiting 5 seconds before next request...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
 
         } catch (error) {
           console.error(`Error generating image for ${tab.name}:`, error);
