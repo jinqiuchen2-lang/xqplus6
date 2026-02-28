@@ -115,6 +115,12 @@ export default function Home() {
   const [isGeneratingAllImages, setIsGeneratingAllImages] = useState(false);
   const [allGeneratedImages, setAllGeneratedImages] = useState<Array<{ tabId: string; tabName: string; url: string; prompt: string }>>([]);
 
+  // Check if any prompts exist
+  const hasAnyPrompts = TABS.some(tab => {
+    const prompt = editedPrompts[tab.id];
+    return prompt && prompt.trim().length > 0;
+  });
+
   // Module 3: History State - Load from localStorage on mount
   const [history, setHistory] = useState<GeneratedImage[]>([]);
 
@@ -1291,6 +1297,7 @@ export default function Home() {
                   className="btn btn-primary"
                   onClick={generateImage}
                   disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                  style={{ flex: 1 }}
                 >
                   {isGeneratingImage ? (
                     <span className="loading">
@@ -1298,25 +1305,27 @@ export default function Home() {
                       生成中...
                     </span>
                   ) : (
-                    '生成图片'
+                    '生成单个图片'
                   )}
                 </button>
                 <button
                   className="btn btn-secondary"
                   onClick={generateAllImages}
-                  disabled={isGeneratingAllImages || isGeneratingImage}
+                  disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
                   style={{
-                    backgroundColor: isGeneratingAllImages ? '#94a3b8' : '#10b981',
-                    borderColor: isGeneratingAllImages ? '#94a3b8' : '#10b981',
+                    flex: 1,
+                    backgroundColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
+                    borderColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
+                    color: 'white',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isGeneratingAllImages) {
-                      e.currentTarget.style.backgroundColor = '#059669';
+                    if (!isGeneratingAllImages && hasAnyPrompts) {
+                      e.currentTarget.style.backgroundColor = '#7C3AED';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isGeneratingAllImages) {
-                      e.currentTarget.style.backgroundColor = '#10b981';
+                    if (!isGeneratingAllImages && hasAnyPrompts) {
+                      e.currentTarget.style.backgroundColor = '#8B5CF6';
                     }
                   }}
                 >
