@@ -1564,7 +1564,7 @@ export default function Home() {
                 <div key={item.id} className="history-item">
                   {item.isBatch && item.batchImages ? (
                     // Batch item display
-                    <div style={{ width: '100%' }}>
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
                       <div style={{
                         position: 'relative',
                         cursor: 'pointer',
@@ -1576,8 +1576,7 @@ export default function Home() {
                         <img
                           src={item.url}
                           alt="批量生成预览"
-                          className="history-item-image"
-                          style={{ cursor: 'pointer' }}
+                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
                           onClick={() => openImageModal(item.url)}
                         />
                         <div style={{
@@ -1595,13 +1594,13 @@ export default function Home() {
                           {item.posterType} ({item.batchImages.length} 张)
                         </div>
                       </div>
-                      <div className="history-item-content">
+                      <div style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <div className="history-item-date">
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                             {item.date}
                           </div>
                           <button
-                            className="btn btn-secondary btn-download"
+                            className="btn btn-secondary"
                             onClick={() => {
                               // Download all batch images
                               item.batchImages?.forEach((img, i) => {
