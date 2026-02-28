@@ -1445,14 +1445,14 @@ export default function Home() {
                           style={{
                             padding: '6px 12px',
                             fontSize: '12px',
-                            backgroundColor: '#10b981',
-                            borderColor: '#10b981',
+                            backgroundColor: '#5079FF',
+                            borderColor: '#5079FF',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#059669';
+                            e.currentTarget.style.backgroundColor = '#4366e0';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#10b981';
+                            e.currentTarget.style.backgroundColor = '#5079FF';
                           }}
                         >
                           下载
