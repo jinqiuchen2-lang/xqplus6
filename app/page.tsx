@@ -111,6 +111,10 @@ export default function Home() {
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
   const [tabsTriedGenerating, setTabsTriedGenerating] = useState<Record<string, boolean>>({});
 
+  // Generate All Images state
+  const [isGeneratingAllImages, setIsGeneratingAllImages] = useState(false);
+  const [allGeneratedImages, setAllGeneratedImages] = useState<Array<{ tabId: string; tabName: string; url: string; prompt: string }>>([]);
+
   // Module 3: History State - Load from localStorage on mount
   const [history, setHistory] = useState<GeneratedImage[]>([]);
 
@@ -717,6 +721,206 @@ export default function Home() {
     }
   };
 
+  const generateAllImages = async () => {
+    if (uploadedImages.length === 0) {
+      alert('请先上传图片');
+      return;
+    }
+
+    // Find all tabs with prompts
+    const tabsWithPrompts = TABS.filter(tab => {
+      const prompt = editedPrompts[tab.id];
+      return prompt && prompt.trim().length > 0;
+    });
+
+    if (tabsWithPrompts.length === 0) {
+      alert('没有可用的提示词，请先生成提示词');
+      return;
+    }
+
+    setIsGeneratingAllImages(true);
+    setAllGeneratedImages([]);
+    setCurrentGeneratedImage(null); // Clear single image display
+
+    const results: Array<{ tabId: string; tabName: string; url: string; prompt: string }> = [];
+
+    try {
+      // For KIE mode, upload images to KIE first (once, reused for all prompts)
+      let imagesToSend: string[];
+
+      if (selectedMode === 'kie') {
+        console.log('=== KIE Mode: Uploading images to KIE storage ===');
+        const kieUrls: string[] = [];
+
+        for (let i = 0; i < uploadedImages.length; i++) {
+          const img = uploadedImages[i];
+          console.log(`Uploading image ${i + 1}/${uploadedImages.length} to KIE...`);
+
+          try {
+            const uploadResponse = await fetch('/api/upload-to-kie', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                base64Data: img.dataUrl,
+                fileName: `upload-${Date.now()}-${i}.png`,
+              }),
+            });
+
+            if (!uploadResponse.ok) {
+              const errorData = await uploadResponse.json();
+              throw new Error(errorData.error || '上传到KIE失败');
+            }
+
+            const uploadData = await uploadResponse.json();
+            kieUrls.push(uploadData.url);
+            console.log(`Image ${i + 1} uploaded to KIE: ${uploadData.url}`);
+          } catch (error) {
+            console.error(`Failed to upload image ${i + 1} to KIE:`, error);
+            throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+          }
+        }
+
+        imagesToSend = kieUrls;
+        console.log('All images uploaded to KIE, URLs:', kieUrls);
+      } else {
+        // For other modes, send base64 data directly
+        imagesToSend = uploadedImages.map((img) => img.dataUrl);
+      }
+
+      // Generate images for each tab sequentially
+      for (const tab of tabsWithPrompts) {
+        const prompt = editedPrompts[tab.id];
+        const promptData = prompts[tab.id];
+        const constraint = promptData?.constraint || '';
+
+        console.log(`Generating image for ${tab.name}...`);
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes per image
+
+          const response = await fetch('/api/generate-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              images: imagesToSend,
+              prompt: prompt,
+              constraint: constraint,
+              ratio: selectedRatio,
+              quality: selectedQuality,
+              mode: selectedMode,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Failed to generate ${tab.name}:`, errorData.error);
+            continue; // Skip this tab and continue with others
+          }
+
+          const data = await response.json();
+
+          // Handle KIE mode (async task)
+          if (selectedMode === 'kie' && data.taskId) {
+            // Poll for task completion
+            const result = await pollKieTaskStatusForResult(data.taskId, prompt);
+            if (result) {
+              results.push({
+                tabId: tab.id,
+                tabName: tab.name,
+                url: result,
+                prompt: prompt,
+              });
+            }
+          } else if (data.imageUrl) {
+            // Handle direct image URL response
+            results.push({
+              tabId: tab.id,
+              tabName: tab.name,
+              url: data.imageUrl,
+              prompt: prompt,
+            });
+          }
+
+          // Update results incrementally
+          setAllGeneratedImages([...results]);
+
+        } catch (error) {
+          console.error(`Error generating image for ${tab.name}:`, error);
+          // Continue with next tab
+        }
+      }
+
+      setIsGeneratingAllImages(false);
+
+      if (results.length === 0) {
+        alert('所有图片生成失败，请重试');
+      } else if (results.length < tabsWithPrompts.length) {
+        alert(`部分图片生成成功 (${results.length}/${tabsWithPrompts.length})`);
+      }
+
+    } catch (error) {
+      console.error('Error in generateAllImages:', error);
+      alert(`生成全部图片失败：${error instanceof Error ? error.message : '未知错误'}`);
+      setIsGeneratingAllImages(false);
+    }
+  };
+
+  // Poll KIE task status and return the image URL
+  const pollKieTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
+    const maxAttempts = 60; // 5 minutes total (5s * 60)
+    const interval = 5000; // Poll every 5 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`/api/kie-task-status?taskId=${taskId}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to check task status');
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'completed' && data.result) {
+          // Extract URL from result - support multiple formats
+          const uploadData = data.result;
+          const url = uploadData.url ||
+                      uploadData.downloadUrl ||
+                      uploadData.fileUrl ||
+                      uploadData.data?.url ||
+                      uploadData.data?.downloadUrl ||
+                      uploadData.data?.fileUrl;
+
+          if (url) {
+            console.log('KIE task completed, image URL:', url);
+            return url;
+          } else {
+            console.error('KIE completed but no URL found in result:', uploadData);
+            return null;
+          }
+        }
+
+        if (data.status === 'failed') {
+          console.error('KIE task failed:', data.error);
+          return null;
+        }
+
+        // Still processing, wait before next poll
+        await new Promise(resolve => setTimeout(resolve, interval));
+      } catch (error) {
+        console.error('Error polling KIE task status:', error);
+        // Continue polling
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+    }
+
+    console.error('KIE task timeout');
+    return null;
+  };
+
   const downloadImage = async (url: string, filename: string) => {
     try {
       let blobUrl: string;
@@ -1082,25 +1286,130 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
-                className="btn btn-primary"
-                onClick={generateImage}
-                disabled={isGeneratingImage || !currentEditedPrompt}
-              >
-                {isGeneratingImage ? (
-                  <span className="loading">
-                    <span className="spinner" />
-                    生成中...
-                  </span>
-                ) : (
-                  '生成图片'
-                )}
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={generateImage}
+                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                >
+                  {isGeneratingImage ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成图片'
+                  )}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={generateAllImages}
+                  disabled={isGeneratingAllImages || isGeneratingImage}
+                  style={{
+                    backgroundColor: isGeneratingAllImages ? '#94a3b8' : '#10b981',
+                    borderColor: isGeneratingAllImages ? '#94a3b8' : '#10b981',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isGeneratingAllImages) {
+                      e.currentTarget.style.backgroundColor = '#059669';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isGeneratingAllImages) {
+                      e.currentTarget.style.backgroundColor = '#10b981';
+                    }
+                  }}
+                >
+                  {isGeneratingAllImages ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成全部图片'
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Right: Image Display */}
             <div className="image-display">
-              {isGeneratingImage ? (
+              {isGeneratingAllImages ? (
+                <div className="loading">
+                  <span className="spinner" style={{ width: 32, height: 32 }} />
+                  <span>正在批量生成图片，请稍候...</span>
+                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                    已完成 {allGeneratedImages.length} 张，请耐心等待...
+                  </p>
+                </div>
+              ) : allGeneratedImages.length > 0 ? (
+                <div style={{ width: '100%', maxHeight: '500px', overflowY: 'auto', padding: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                    {allGeneratedImages.map((item, index) => (
+                      <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{
+                          position: 'relative',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          border: '1px solid #e5e7eb',
+                          backgroundColor: '#f9fafb'
+                        }}>
+                          <img
+                            src={item.url}
+                            alt={item.tabName}
+                            style={{ width: '100%', height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => openImageModal(item.url)}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: '0',
+                            left: '0',
+                            right: '0',
+                            padding: '6px 8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                            color: 'white',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            textAlign: 'center'
+                          }}>
+                            {item.tabName}
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            backgroundColor: '#10b981',
+                            borderColor: '#10b981',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#059669';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#10b981';
+                          }}
+                        >
+                          下载
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setAllGeneratedImages([])}
+                    style={{
+                      marginTop: '16px',
+                      width: '100%',
+                      padding: '8px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    清空批量显示
+                  </button>
+                </div>
+              ) : isGeneratingImage ? (
                 <div className="loading">
                   <span className="spinner" style={{ width: 32, height: 32 }} />
                   <span>正在生成图片，请稍候...</span>
@@ -1145,7 +1454,7 @@ export default function Home() {
                 <div className="placeholder">
                   <p>生成的海报将显示在这里</p>
                   <p style={{ marginTop: '8px', fontSize: '12px' }}>
-                    选择提示词和参数后点击"生成图片"
+                    选择提示词和参数后点击"生成图片"或"生成全部图片"
                   </p>
                 </div>
               )}
