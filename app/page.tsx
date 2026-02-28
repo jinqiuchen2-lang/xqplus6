@@ -359,8 +359,26 @@ export default function Home() {
 
     setIsGeneratingPrompts(true);
 
+    // Fetch with timeout helper
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 180000) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    };
+
     try {
-      const response = await fetch('/api/generate-prompts', {
+      const response = await fetchWithTimeout('/api/generate-prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -161,7 +161,7 @@ Step 4: Generate Complete Prompt (System Refined)
 `;
 
 // Helper function to fetch with retry
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2, timeoutMs = 45000): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2, timeoutMs = 120000): Promise<Response> {
   for (let i = 0; i <= maxRetries; i++) {
     // Create a fresh abort controller for each attempt
     const controller = new AbortController();
