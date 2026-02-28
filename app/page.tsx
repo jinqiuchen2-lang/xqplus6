@@ -932,9 +932,9 @@ export default function Home() {
         const newHistoryItem: GeneratedImage = {
           id: Date.now().toString(),
           url: results[0].url, // Use first image as thumbnail
-          prompt: `批量生成 ${results.length} 张图片`,
+          prompt: `批量 ${results.length} 张图片`,
           date: new Date().toLocaleString('zh-CN'),
-          posterType: '批量生成',
+          posterType: '批量',
           isBatch: true,
           batchImages: results,
         };
