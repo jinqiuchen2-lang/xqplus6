@@ -1563,9 +1563,9 @@ export default function Home() {
               {history.map((item, index) => (
                 <div key={item.id} className="history-item">
                   {item.isBatch && item.batchImages ? (
-                    // Batch item display
-                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-                      {/* Show batch images thumbnails at top */}
+                    // Batch item display - match single item structure
+                    <>
+                      {/* Show batch images thumbnails as main image area */}
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(2, 1fr)',
@@ -1576,48 +1576,30 @@ export default function Home() {
                         border: '1px solid #e5e7eb'
                       }}>
                         {item.batchImages.map((img, i) => (
-                          <div key={i} style={{ position: 'relative' }}>
-                            <img
-                              src={img.url}
-                              alt={img.tabName}
-                              style={{
-                                width: '100%',
-                                aspectRatio: '1',
-                                objectFit: 'cover',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                border: '1px solid #e5e7eb'
-                              }}
-                              onClick={() => openImageModal(img.url)}
-                              title={img.tabName}
-                            />
-                            {i === 0 && (
-                              <div style={{
-                                position: 'absolute',
-                                top: '0',
-                                left: '0',
-                                right: '0',
-                                padding: '4px 6px',
-                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                                color: 'white',
-                                fontSize: '10px',
-                                fontWeight: '500',
-                                textAlign: 'center',
-                                borderRadius: '4px 4px 0 0'
-                              }}>
-                                {item.posterType} ({item.batchImages!.length} 张)
-                              </div>
-                            )}
-                          </div>
+                          <img
+                            key={i}
+                            src={img.url}
+                            alt={img.tabName}
+                            style={{
+                              width: '100%',
+                              aspectRatio: '1',
+                              objectFit: 'cover',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              border: '1px solid #e5e7eb'
+                            }}
+                            onClick={() => openImageModal(img.url)}
+                            title={img.tabName}
+                          />
                         ))}
                       </div>
-                      <div style={{ padding: '12px' }}>
+                      <div className="history-item-content">
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            {item.date}
+                          <div className="history-item-date">
+                            {item.posterType} ({item.batchImages!.length} 张) · {item.date}
                           </div>
                           <button
-                            className="btn btn-secondary"
+                            className="btn btn-secondary btn-download"
                             onClick={() => {
                               // Download all batch images
                               item.batchImages!.forEach((img, i) => {
@@ -1638,7 +1620,7 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </>
                   ) : (
                     // Single item display
                     <>
