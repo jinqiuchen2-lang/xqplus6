@@ -224,9 +224,9 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting prompt generation for', images.length, 'images');
 
-    // Generate prompts for each poster type
-    const prompts = await Promise.all(
-      PROMPT_SPECS.map(async (spec) => {
+    // Generate prompts sequentially to avoid timeout
+    const prompts: any[] = [];
+    for (const spec of PROMPT_SPECS) {
         let response: Response;
         try {
           console.log(`Generating prompt for ${spec.name} (${spec.type})`);
@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`Parsed for ${spec.name} - Prompt length:`, chinesePrompt.length, 'Has layout:', !!layout);
 
-        return {
+        prompts.push({
           type: spec.type,
           name: spec.name,
           chinesePrompt: chinesePrompt,
@@ -394,7 +394,7 @@ export async function POST(request: NextRequest) {
           identificationReport: identificationReport,
           layout: layout,
           fullPrompt: content
-        };
+        });
       } catch (error) {
           console.error(`Error generating prompt for ${spec.name}:`, error);
 
@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Return a default prompt on error
-          return {
+          prompts.push({
             type: spec.type,
             name: spec.name,
             chinesePrompt: `请生成${spec.name}风格的海报，展示产品特点和视觉效果。要求构图合理，光影协调，色彩和谐。`,
@@ -413,10 +413,9 @@ export async function POST(request: NextRequest) {
             identificationReport: '',
             layout: '',
             fullPrompt: ''
-          };
+          });
         }
-      })
-    );
+    }
 
     console.log('All prompts generated successfully');
     return NextResponse.json({ prompts });
