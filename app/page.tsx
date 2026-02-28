@@ -602,9 +602,10 @@ export default function Home() {
       return;
     }
 
+    // Set generating state first to immediately show loading, then clear previous states
     setIsGeneratingImage(true);
+    setAllGeneratedImages([]);
     setCurrentGeneratedImage(null);
-    setAllGeneratedImages([]); // Clear batch display when generating single image
 
     // Get the constraint for current tab
     const currentPrompt = prompts[activeTab];
@@ -747,9 +748,10 @@ export default function Home() {
       return;
     }
 
+    // Set generating state first to immediately show loading, then clear previous states
     setIsGeneratingAllImages(true);
     setAllGeneratedImages([]);
-    setCurrentGeneratedImage(null); // Clear single image display
+    setCurrentGeneratedImage(null);
 
     const results: Array<{ tabId: string; tabName: string; url: string; prompt: string }> = [];
 
