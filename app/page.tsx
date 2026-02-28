@@ -132,9 +132,24 @@ export default function Home() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // Migrate old data: replace "批量生成" with "批量"
+        let needsMigration = false;
+        const migrated = parsed.map((item: GeneratedImage) => {
+          if (item.posterType === '批量生成') {
+            needsMigration = true;
+            return { ...item, posterType: '批量' };
+          }
+          return item;
+        });
+
+        if (needsMigration) {
+          // Save migrated data back to localStorage
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(migrated));
+        }
+
         console.log('Loaded history from localStorage:', parsed.length, 'items');
         console.log('First item prompt:', parsed[0]?.prompt);
-        setHistory(parsed);
+        setHistory(migrated);
       } catch (e) {
         console.error('Failed to parse history:', e);
         // Invalid data, ignore
