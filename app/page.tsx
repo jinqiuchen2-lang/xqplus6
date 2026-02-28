@@ -1565,34 +1565,51 @@ export default function Home() {
                   {item.isBatch && item.batchImages ? (
                     // Batch item display
                     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                      {/* Show batch images thumbnails at top */}
                       <div style={{
-                        position: 'relative',
-                        cursor: 'pointer',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '4px',
+                        padding: '4px',
+                        backgroundColor: '#f9fafb',
                         borderRadius: '8px',
-                        overflow: 'hidden',
-                        border: '1px solid #e5e7eb',
-                        backgroundColor: '#f9fafb'
+                        border: '1px solid #e5e7eb'
                       }}>
-                        <img
-                          src={item.url}
-                          alt="批量生成预览"
-                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => openImageModal(item.url)}
-                        />
-                        <div style={{
-                          position: 'absolute',
-                          top: '0',
-                          left: '0',
-                          right: '0',
-                          padding: '6px 8px',
-                          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                          color: 'white',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          textAlign: 'center'
-                        }}>
-                          {item.posterType} ({item.batchImages.length} 张)
-                        </div>
+                        {item.batchImages.map((img, i) => (
+                          <div key={i} style={{ position: 'relative' }}>
+                            <img
+                              src={img.url}
+                              alt={img.tabName}
+                              style={{
+                                width: '100%',
+                                aspectRatio: '1',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: '1px solid #e5e7eb'
+                              }}
+                              onClick={() => openImageModal(img.url)}
+                              title={img.tabName}
+                            />
+                            {i === 0 && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '0',
+                                left: '0',
+                                right: '0',
+                                padding: '4px 6px',
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                color: 'white',
+                                fontSize: '10px',
+                                fontWeight: '500',
+                                textAlign: 'center',
+                                borderRadius: '4px 4px 0 0'
+                              }}>
+                                {item.posterType} ({item.batchImages.length} 张)
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                       <div style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -1619,26 +1636,6 @@ export default function Home() {
                           >
                             下载全部
                           </button>
-                        </div>
-                        {/* Show batch images thumbnails */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                          {item.batchImages.map((img, i) => (
-                            <img
-                              key={i}
-                              src={img.url}
-                              alt={img.tabName}
-                              style={{
-                                width: '100%',
-                                aspectRatio: '1',
-                                objectFit: 'cover',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                border: '1px solid #e5e7eb'
-                              }}
-                              onClick={() => openImageModal(img.url)}
-                              title={img.tabName}
-                            />
-                          ))}
                         </div>
                       </div>
                     </div>
