@@ -1588,7 +1588,8 @@ export default function Home() {
                         padding: '4px',
                         backgroundColor: '#f9fafb',
                         borderRadius: '8px',
-                        border: '1px solid #e5e7eb'
+                        border: '1px solid #e5e7eb',
+                        marginBottom: '12px'
                       }}>
                         {item.batchImages.map((img, i) => (
                           <img
@@ -1643,7 +1644,7 @@ export default function Home() {
                         src={item.url}
                         alt="生成的海报"
                         className="history-item-image"
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', marginBottom: '12px' }}
                         onClick={() => openImageModal(item.url)}
                       />
                       <div className="history-item-content">
