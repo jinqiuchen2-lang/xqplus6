@@ -288,10 +288,18 @@ body {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
+  flex-shrink: 0;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
 }
 
 .history-item-content {
   padding: 12px;
+  padding-top: 0;
+  margin-top: auto;
 }
 
 .history-item-date {
