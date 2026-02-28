@@ -53,7 +53,7 @@ const PROMPT_SPECS = [
     type: 'color_inspiration',
     posterId: '海报07',
     posterStyle: '配色灵感',
-    instruction: `配色灵感（画面中不展示任何文字）`
+    instruction: `配色灵感（画面中不展示任何英文和数字）`
   }
 ];
 
