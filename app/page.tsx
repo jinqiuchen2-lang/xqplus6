@@ -935,40 +935,37 @@ export default function Home() {
 
   // Poll KIE task status and return the image URL
   const pollKieTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
-    const maxAttempts = 60; // 5 minutes total (5s * 60)
-    const interval = 5000; // Poll every 5 seconds
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await fetch(`/api/kie-task-status?taskId=${taskId}`);
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
 
         if (!response.ok) {
-          throw new Error('Failed to check task status');
+          throw new Error('查询任务状态失败');
         }
 
         const data = await response.json();
+        const { state, resultJson, failMsg } = data;
 
-        if (data.status === 'completed' && data.result) {
-          // Extract URL from result - support multiple formats
-          const uploadData = data.result;
-          const url = uploadData.url ||
-                      uploadData.downloadUrl ||
-                      uploadData.fileUrl ||
-                      uploadData.data?.url ||
-                      uploadData.data?.downloadUrl ||
-                      uploadData.data?.fileUrl;
+        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
 
-          if (url) {
-            console.log('KIE task completed, image URL:', url);
-            return url;
-          } else {
-            console.error('KIE completed but no URL found in result:', uploadData);
+        if (state === 'success') {
+          const result = JSON.parse(resultJson);
+          const imageUrl = result.resultUrls?.[0];
+
+          if (!imageUrl) {
+            console.error('KIE completed but no URL found');
             return null;
           }
+
+          console.log('KIE task completed, image URL:', imageUrl);
+          return imageUrl;
         }
 
-        if (data.status === 'failed') {
-          console.error('KIE task failed:', data.error);
+        if (state === 'fail') {
+          console.error('KIE task failed:', failMsg);
           return null;
         }
 
