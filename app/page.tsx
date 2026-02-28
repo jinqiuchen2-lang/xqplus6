@@ -17,6 +17,8 @@ interface GeneratedImage {
   prompt: string;
   date: string;
   posterType: string;
+  isBatch?: boolean;
+  batchImages?: Array<{ tabId: string; tabName: string; url: string; prompt: string }>;
 }
 
 interface UploadedImage {
@@ -922,8 +924,24 @@ export default function Home() {
 
       if (results.length === 0) {
         alert('所有图片生成失败，请重试');
-      } else if (results.length < tabsWithPrompts.length) {
-        alert(`部分图片生成成功 (${results.length}/${tabsWithPrompts.length})`);
+      } else {
+        // Add batch results to history
+        const newHistoryItem: GeneratedImage = {
+          id: Date.now().toString(),
+          url: results[0].url, // Use first image as thumbnail
+          prompt: `批量生成 ${results.length} 张图片`,
+          date: new Date().toLocaleString('zh-CN'),
+          posterType: '批量生成',
+          isBatch: true,
+          batchImages: results,
+        };
+        console.log('Saving batch to history:', newHistoryItem);
+        const newHistory = [newHistoryItem, ...history].slice(0, MAX_HISTORY_ITEMS);
+        setHistory(newHistory);
+
+        if (results.length < tabsWithPrompts.length) {
+          alert(`部分图片生成成功 (${results.length}/${tabsWithPrompts.length})`);
+        }
       }
 
     } catch (error) {
@@ -1445,14 +1463,15 @@ export default function Home() {
                           style={{
                             padding: '6px 12px',
                             fontSize: '12px',
-                            backgroundColor: '#5079FF',
-                            borderColor: '#5079FF',
+                            backgroundColor: '#f3f4f6',
+                            borderColor: '#d1d5db',
+                            color: '#374151',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#4366e0';
+                            e.currentTarget.style.backgroundColor = '#e5e7eb';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#5079FF';
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
                           }}
                         >
                           下载
@@ -1490,20 +1509,23 @@ export default function Home() {
                     onClick={() => openImageModal(currentGeneratedImage!)}
                   />
                   <button
-                    className="btn btn-primary"
+                    className="btn btn-secondary"
                     onClick={() => downloadImage(currentGeneratedImage!, `generated-${Date.now()}.jpg`)}
                     style={{
                       padding: '8px 24px',
                       fontSize: '14px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      backgroundColor: '#f3f4f6',
+                      borderColor: '#d1d5db',
+                      color: '#374151',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#4366e0';
+                      e.currentTarget.style.backgroundColor = '#e5e7eb';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#5079FF';
+                      e.currentTarget.style.backgroundColor = '#f3f4f6';
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1537,37 +1559,121 @@ export default function Home() {
             <div className="history-grid">
               {history.map((item, index) => (
                 <div key={item.id} className="history-item">
-                  <img
-                    src={item.url}
-                    alt="生成的海报"
-                    className="history-item-image"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => openImageModal(item.url)}
-                  />
-                  <div className="history-item-content">
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <div className="history-item-date">
-                        {item.posterType} · {item.date}
+                  {item.isBatch && item.batchImages ? (
+                    // Batch item display
+                    <div style={{ width: '100%' }}>
+                      <div style={{
+                        position: 'relative',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#f9fafb'
+                      }}>
+                        <img
+                          src={item.url}
+                          alt="批量生成预览"
+                          className="history-item-image"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => openImageModal(item.url)}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          right: '0',
+                          padding: '6px 8px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                          color: 'white',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          textAlign: 'center'
+                        }}>
+                          {item.posterType} ({item.batchImages.length} 张)
+                        </div>
                       </div>
-                      <button
-                        className="btn btn-secondary btn-download"
-                        onClick={() =>
-                          downloadImage(item.url, `poster-${item.id}.jpg`)
-                        }
-                        style={{ padding: '4px 10px', fontSize: '11px' }}
-                      >
-                        下载
-                      </button>
+                      <div className="history-item-content">
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <div className="history-item-date">
+                            {item.date}
+                          </div>
+                          <button
+                            className="btn btn-secondary btn-download"
+                            onClick={() => {
+                              // Download all batch images
+                              item.batchImages?.forEach((img, i) => {
+                                setTimeout(() => {
+                                  downloadImage(img.url, `${img.tabName}-${item.id}-${i}.jpg`);
+                                }, i * 500);
+                              });
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                          >
+                            下载全部
+                          </button>
+                        </div>
+                        {/* Show batch images thumbnails */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
+                          {item.batchImages.map((img, i) => (
+                            <img
+                              key={i}
+                              src={img.url}
+                              alt={img.tabName}
+                              style={{
+                                width: '100%',
+                                aspectRatio: '1',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: '1px solid #e5e7eb'
+                              }}
+                              onClick={() => openImageModal(img.url)}
+                              title={img.tabName}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    {/* Prompt hidden - not displayed in history */}
-                    {/* <div className="history-item-prompt">
-                      {item.prompt ? (
-                        <span>{item.prompt}</span>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>暂无提示词</span>
-                      )}
-                    </div> */}
-                  </div>
+                  ) : (
+                    // Single item display
+                    <>
+                      <img
+                        src={item.url}
+                        alt="生成的海报"
+                        className="history-item-image"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openImageModal(item.url)}
+                      />
+                      <div className="history-item-content">
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <div className="history-item-date">
+                            {item.posterType} · {item.date}
+                          </div>
+                          <button
+                            className="btn btn-secondary btn-download"
+                            onClick={() =>
+                              downloadImage(item.url, `poster-${item.id}.jpg`)
+                            }
+                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                          >
+                            下载
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
