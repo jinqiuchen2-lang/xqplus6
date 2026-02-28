@@ -1605,7 +1605,7 @@ export default function Home() {
                                 textAlign: 'center',
                                 borderRadius: '4px 4px 0 0'
                               }}>
-                                {item.posterType} ({item.batchImages.length} 张)
+                                {item.posterType} ({item.batchImages!.length} 张)
                               </div>
                             )}
                           </div>
@@ -1620,7 +1620,7 @@ export default function Home() {
                             className="btn btn-secondary"
                             onClick={() => {
                               // Download all batch images
-                              item.batchImages?.forEach((img, i) => {
+                              item.batchImages!.forEach((img, i) => {
                                 setTimeout(() => {
                                   downloadImage(img.url, `${img.tabName}-${item.id}-${i}.jpg`);
                                 }, i * 500);
