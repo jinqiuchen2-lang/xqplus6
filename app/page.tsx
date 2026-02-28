@@ -604,6 +604,7 @@ export default function Home() {
 
     setIsGeneratingImage(true);
     setCurrentGeneratedImage(null);
+    setAllGeneratedImages([]); // Clear batch display when generating single image
 
     // Get the constraint for current tab
     const currentPrompt = prompts[activeTab];
