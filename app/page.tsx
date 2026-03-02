@@ -1518,7 +1518,8 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  <button
+                </div>
+                <button
                     className="btn btn-secondary"
                     onClick={() => setAllGeneratedImages([])}
                     style={{
