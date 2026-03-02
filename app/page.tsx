@@ -1444,16 +1444,27 @@ export default function Home() {
 
             {/* Right: Image Display */}
             <div className="image-display">
-              {isGeneratingAllImages ? (
-                <div className="loading">
-                  <span className="spinner" style={{ width: 32, height: 32 }} />
-                  <span>正在批量生成图片，请稍候...</span>
-                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
-                    已完成 {allGeneratedImages.length} 张，请耐心等待...
-                  </p>
-                </div>
-              ) : allGeneratedImages.length > 0 ? (
-                <div style={{ width: '100%', maxHeight: '500px', overflowY: 'auto', padding: '8px' }}>
+              {allGeneratedImages.length > 0 ? (
+                <div>
+                  {/* Show progress info if still generating */}
+                  {isGeneratingAllImages && (
+                    <div style={{
+                      padding: '12px',
+                      marginBottom: '12px',
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span className="spinner" style={{ width: 20, height: 20 }} />
+                      <span style={{ fontSize: '14px', color: '#0369a1' }}>
+                        正在批量生成图片，已完成 {allGeneratedImages.length} 张...
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ width: '100%', maxHeight: '500px', overflowY: 'auto', padding: '8px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
                     {allGeneratedImages.map((item, index) => (
                       <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1519,6 +1530,14 @@ export default function Home() {
                   >
                     清空批量显示
                   </button>
+                </div>
+              ) : isGeneratingAllImages ? (
+                <div className="loading">
+                  <span className="spinner" style={{ width: 32, height: 32 }} />
+                  <span>正在批量生成图片，请稍候...</span>
+                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                    正在处理第一张图片...
+                  </p>
                 </div>
               ) : isGeneratingImage ? (
                 <div className="loading">
