@@ -247,6 +247,34 @@ export async function POST(request: NextRequest) {
           let creditsConsumed = 0;
 
           try {
+            const requestBody = {
+              messages: [
+                {
+                  role: 'system',
+                  content: systemPrompt
+                },
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`
+                    },
+                    ...images.map((img: string) => ({
+                      type: 'image_url',
+                      image_url: { url: img }
+                    }))
+                  ]
+                }
+              ],
+              include_thoughts: true,
+              reasoning_effort: 'high',
+              max_tokens: 1500,
+            };
+
+            console.log(`[${spec.name}] Request to:`, `${API_URL}/gemini-3-flash/v1/chat/completions`);
+            console.log(`[${spec.name}] Starting fetch request...`);
+
             response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
               method: 'POST',
               headers: {
@@ -254,32 +282,11 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${API_KEY}`,
                 'Accept': 'text/event-stream',
               },
-              body: JSON.stringify({
-                messages: [
-                  {
-                    role: 'system',
-                    content: systemPrompt
-                  },
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`
-                      },
-                      ...images.map((img: string) => ({
-                        type: 'image_url',
-                        image_url: { url: img }
-                      }))
-                    ]
-                  }
-                ],
-                include_thoughts: true,
-                reasoning_effort: 'high',
-                max_tokens: 1500,
-              }),
+              body: JSON.stringify(requestBody),
               signal: controller.signal,
             });
+
+            console.log(`[${spec.name}] Fetch completed, response status:`, response.status);
 
             clearTimeout(timeoutId);
 
@@ -355,6 +362,11 @@ export async function POST(request: NextRequest) {
 
           } catch (fetchError: any) {
             clearTimeout(timeoutId);
+            console.error(`[${spec.name}] Fetch error details:`, {
+              name: fetchError?.name,
+              message: fetchError?.message,
+              cause: fetchError?.cause,
+            });
             if (fetchError.name === 'AbortError') {
               throw new Error('请求超时，请稍后重试');
             }
