@@ -317,18 +317,37 @@ export async function POST(request: NextRequest) {
               throw new Error('无法读取响应流');
             }
 
+            console.log(`[${spec.name}] Starting to read stream...`);
             let buffer = '';
+            let chunkCount = 0;
             while (true) {
               const { done, value } = await reader.read();
-              if (done) break;
+              if (done) {
+                console.log(`[${spec.name}] Stream done. Total chunks: ${chunkCount}`);
+                break;
+              }
 
-              buffer += decoder.decode(value, { stream: true });
+              chunkCount++;
+              const chunk = decoder.decode(value, { stream: true });
+              buffer += chunk;
+
+              // Log first few chunks for debugging
+              if (chunkCount <= 3) {
+                console.log(`[${spec.name}] Chunk ${chunkCount}:`, chunk.substring(0, 200));
+              }
+
               const lines = buffer.split('\n');
               buffer = lines.pop() || '';
 
               for (const line of lines) {
                 const trimmedLine = line.trim();
-                if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+                if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
+                  // Log non-data lines for debugging
+                  if (trimmedLine && chunkCount <= 3) {
+                    console.log(`[${spec.name}] Non-data line:`, trimmedLine.substring(0, 100));
+                  }
+                  continue;
+                }
 
                 const dataStr = trimmedLine.slice(6).trim();
                 if (dataStr === '[DONE]') continue;
@@ -350,10 +369,15 @@ export async function POST(request: NextRequest) {
                     creditsConsumed = data.credits_consumed;
                   }
                 } catch (e) {
-                  // Skip invalid JSON
+                  // Log parse errors for debugging
+                  if (chunkCount <= 5) {
+                    console.log(`[${spec.name}] Parse error:`, e instanceof Error ? e.message : e);
+                  }
                 }
               }
             }
+
+            console.log(`[${spec.name}] Stream processing complete. Content length: ${finalContent.length}, Reasoning length: ${reasoningContent.length}`);
 
             content = finalContent;
             console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
