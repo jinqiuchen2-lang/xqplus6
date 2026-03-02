@@ -235,115 +235,131 @@ export async function POST(request: NextRequest) {
       .replace('{POSTER_NAME}', spec.name)
       .replace('{STYLE}', spec.posterStyle);
 
-    // New API streaming request
+    // New API streaming request with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+
+    let content = '';
     let reasoningContent = '';
     let finalContent = '';
     let creditsConsumed = 0;
 
-    const response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
-              },
-              ...images.map((img: string) => ({
-                type: 'image_url',
-                image_url: { url: img },
-              })),
-            ],
-          },
-        ],
-        include_thoughts: true,
-        reasoning_effort: 'high',
-        max_tokens: 1500,
-      }),
-    });
+    try {
+      const response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${API_KEY}`,
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
+                },
+                ...images.map((img: string) => ({
+                  type: 'image_url',
+                  image_url: { url: img },
+                })),
+              ],
+            },
+          ],
+          include_thoughts: true,
+          reasoning_effort: 'high',
+          max_tokens: 1500,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API Error for ${spec.name}:`, response.status, errorText);
+      clearTimeout(timeoutId);
 
-      // Provide more specific error messages
-      let errorMessage = '生成提示词失败，请稍后重试';
-      if (response.status === 401) {
-        errorMessage = 'API密钥无效，请检查配置';
-      } else if (response.status === 403) {
-        errorMessage = 'API访问被拒绝，请检查权限';
-      } else if (response.status === 429) {
-        errorMessage = '请求过于频繁，请稍后再试';
-      } else if (response.status >= 500) {
-        errorMessage = 'API服务暂时不可用，请稍后重试';
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API Error for ${spec.name}:`, response.status, errorText);
+
+        // Provide more specific error messages
+        let errorMessage = '生成提示词失败，请稍后重试';
+        if (response.status === 401) {
+          errorMessage = 'API密钥无效，请检查配置';
+        } else if (response.status === 403) {
+          errorMessage = 'API访问被拒绝，请检查权限';
+        } else if (response.status === 429) {
+          errorMessage = '请求过于频繁，请稍后再试';
+        } else if (response.status >= 500) {
+          errorMessage = 'API服务暂时不可用，请稍后重试';
+        }
+
+        throw new Error(errorMessage);
       }
 
-      throw new Error(errorMessage);
-    }
+      // Process streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-    // Process streaming response
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error('无法读取响应流');
+      }
 
-    if (!reader) {
-      throw new Error('无法读取响应流');
-    }
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+          const dataStr = trimmedLine.slice(6).trim();
+          if (dataStr === '[DONE]') continue;
 
-        const dataStr = trimmedLine.slice(6).trim();
-        if (dataStr === '[DONE]') continue;
+          try {
+            const data = JSON.parse(dataStr);
+            const delta = data.choices?.[0]?.delta;
 
-        try {
-          const data = JSON.parse(dataStr);
-          const delta = data.choices?.[0]?.delta;
+            if (delta?.reasoning_content) {
+              reasoningContent += delta.reasoning_content;
+              console.log('Reasoning content received:', delta.reasoning_content.substring(0, 100));
+            }
 
-          if (delta?.reasoning_content) {
-            reasoningContent += delta.reasoning_content;
-            console.log('Reasoning content received:', delta.reasoning_content.substring(0, 100));
+            if (delta?.content) {
+              finalContent += delta.content;
+            }
+
+            // Check for credits_consumed in the last packet
+            if (data.credits_consumed !== undefined) {
+              creditsConsumed = data.credits_consumed;
+              console.log('Credits consumed:', creditsConsumed);
+            }
+          } catch (e) {
+            // Skip invalid JSON
           }
-
-          if (delta?.content) {
-            finalContent += delta.content;
-          }
-
-          // Check for credits_consumed in the last packet
-          if (data.credits_consumed !== undefined) {
-            creditsConsumed = data.credits_consumed;
-            console.log('Credits consumed:', creditsConsumed);
-          }
-        } catch (e) {
-          // Skip invalid JSON
         }
       }
-    }
 
-    const content = finalContent;
-    console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
-    console.log(`Reasoning content for ${spec.name}:`, reasoningContent.substring(0, 200));
-    console.log(`Credits consumed for ${spec.name}:`, creditsConsumed);
+      content = finalContent;
+      console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
+      console.log(`Reasoning content for ${spec.name}:`, reasoningContent.substring(0, 200));
+      console.log(`Credits consumed for ${spec.name}:`, creditsConsumed);
+
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('请求超时，请稍后重试');
+      }
+      throw fetchError;
+    }
 
     // Parse the response to extract components
     let chinesePrompt = '';
