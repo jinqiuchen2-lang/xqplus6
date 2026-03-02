@@ -320,10 +320,12 @@ export async function POST(request: NextRequest) {
             console.log(`[${spec.name}] Starting to read stream...`);
             let buffer = '';
             let chunkCount = 0;
+            let isStreamingFormat = false; // Track if response is SSE format
+
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
-                console.log(`[${spec.name}] Stream done. Total chunks: ${chunkCount}`);
+                console.log(`[${spec.name}] Stream done. Total chunks: ${chunkCount}, Is streaming format: ${isStreamingFormat}`);
                 break;
               }
 
@@ -341,39 +343,59 @@ export async function POST(request: NextRequest) {
 
               for (const line of lines) {
                 const trimmedLine = line.trim();
-                if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
-                  // Log non-data lines for debugging
-                  if (trimmedLine && chunkCount <= 3) {
-                    console.log(`[${spec.name}] Non-data line:`, trimmedLine.substring(0, 100));
+                if (!trimmedLine) continue;
+
+                // Check if this is SSE format
+                if (trimmedLine.startsWith('data: ')) {
+                  isStreamingFormat = true;
+                  const dataStr = trimmedLine.slice(6).trim();
+                  if (dataStr === '[DONE]') continue;
+
+                  try {
+                    const data = JSON.parse(dataStr);
+                    const delta = data.choices?.[0]?.delta;
+
+                    if (delta?.reasoning_content) {
+                      reasoningContent += delta.reasoning_content;
+                    }
+
+                    if (delta?.content) {
+                      finalContent += delta.content;
+                    }
+
+                    if (data.credits_consumed !== undefined) {
+                      creditsConsumed = data.credits_consumed;
+                    }
+                  } catch (e) {
+                    if (chunkCount <= 5) {
+                      console.log(`[${spec.name}] Parse error:`, e instanceof Error ? e.message : e);
+                    }
                   }
-                  continue;
+                } else if (!isStreamingFormat && chunkCount <= 3) {
+                  // Non-streaming line - might be complete JSON
+                  console.log(`[${spec.name}] Non-data line:`, trimmedLine.substring(0, 100));
                 }
+              }
+            }
 
-                const dataStr = trimmedLine.slice(6).trim();
-                if (dataStr === '[DONE]') continue;
-
-                try {
-                  const data = JSON.parse(dataStr);
-                  const delta = data.choices?.[0]?.delta;
-
-                  if (delta?.reasoning_content) {
-                    reasoningContent += delta.reasoning_content;
-                  }
-
-                  if (delta?.content) {
-                    finalContent += delta.content;
-                  }
-
-                  // Check for credits_consumed in the last packet
-                  if (data.credits_consumed !== undefined) {
-                    creditsConsumed = data.credits_consumed;
-                  }
-                } catch (e) {
-                  // Log parse errors for debugging
-                  if (chunkCount <= 5) {
-                    console.log(`[${spec.name}] Parse error:`, e instanceof Error ? e.message : e);
-                  }
+            // If no streaming format detected, try to parse the whole buffer as JSON
+            if (!isStreamingFormat && buffer.trim()) {
+              console.log(`[${spec.name}] Attempting to parse as non-streaming JSON...`);
+              try {
+                const data = JSON.parse(buffer.trim());
+                if (data.error) {
+                  throw new Error(data.error.message || data.msg || 'API Error');
                 }
+                // Handle non-streaming response format
+                if (data.choices?.[0]?.message?.content) {
+                  finalContent = data.choices[0].message.content;
+                  console.log(`[${spec.name}] Parsed non-streaming response, content length: ${finalContent.length}`);
+                }
+                if (data.credits_consumed !== undefined) {
+                  creditsConsumed = data.credits_consumed;
+                }
+              } catch (e) {
+                console.log(`[${spec.name}] Failed to parse as JSON:`, e instanceof Error ? e.message : e);
               }
             }
 
