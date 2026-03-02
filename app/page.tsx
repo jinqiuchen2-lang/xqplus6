@@ -1395,21 +1395,6 @@ export default function Home() {
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  className="btn btn-primary"
-                  onClick={generateImage}
-                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
-                  style={{ flex: 1 }}
-                >
-                  {isGeneratingImage ? (
-                    <span className="loading">
-                      <span className="spinner" />
-                      生成中...
-                    </span>
-                  ) : (
-                    '生成单个图片'
-                  )}
-                </button>
-                <button
                   className="btn btn-secondary"
                   onClick={generateAllImages}
                   disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
@@ -1437,6 +1422,21 @@ export default function Home() {
                     </span>
                   ) : (
                     '生成全部图片'
+                  )}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={generateImage}
+                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                  style={{ flex: 1 }}
+                >
+                  {isGeneratingImage ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成单个图片'
                   )}
                 </button>
               </div>
