@@ -246,9 +246,9 @@ export async function POST(request: NextRequest) {
 
           // New API streaming request with timeout
           // Note: Vercel has strict limits (Free: 10s, Pro: 60s)
-          // Set timeout to 45s per request - needed for proper AI generation
+          // Set timeout to 9s per request to work within Vercel Free tier limits
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds timeout
+          const timeoutId = setTimeout(() => controller.abort(), 9000); // 9 seconds timeout
 
           let content = '';
           let reasoningContent = '';
@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
               cause: fetchError?.cause,
             });
             if (fetchError.name === 'AbortError') {
-              throw new Error('请求超时（45秒）。API响应时间过长，可能原因：1) 图片太大，请压缩图片；2) API服务繁忙。建议稍后重试。');
+              throw new Error('请求超时（9秒）。API响应时间过长，可能原因：1) 图片太大，请压缩图片；2) API服务繁忙。建议稍后重试。');
             }
             throw fetchError;
           }
