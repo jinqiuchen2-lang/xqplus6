@@ -248,7 +248,6 @@ export async function POST(request: NextRequest) {
 
     try {
       const requestBody = {
-        model: MODEL_NAME,
         messages: [
           {
             role: 'system',
@@ -273,11 +272,11 @@ export async function POST(request: NextRequest) {
         max_tokens: 1500,
       };
 
-      console.log('Request to:', `${API_URL}/v1/chat/completions`);
+      console.log('Request to:', `${API_URL}/gemini-3-flash/v1/chat/completions`);
       console.log('Request body size:', JSON.stringify(requestBody).length);
       console.log('Starting fetch request...');
 
-      const response = await fetch(`${API_URL}/v1/chat/completions`, {
+      const response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
