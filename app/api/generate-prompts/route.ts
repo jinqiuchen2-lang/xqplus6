@@ -240,9 +240,9 @@ export async function POST(request: NextRequest) {
 
           // New API streaming request with timeout
           // Note: Vercel has strict limits (Free: 10s, Pro: 60s)
-          // Set timeout to 8s per request to work within Free tier limits
+          // Set timeout to 45s per request - needed for proper AI generation
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds timeout
 
           let content = '';
           let reasoningContent = '';
@@ -271,8 +271,8 @@ export async function POST(request: NextRequest) {
                 }
               ],
               include_thoughts: true,
-              reasoning_effort: 'medium',
-              max_tokens: 1000,
+              reasoning_effort: 'high',
+              max_tokens: 2000,
             };
 
             console.log(`[${spec.name}] Request to:`, `${API_URL}/gemini-3-flash/v1/chat/completions`);
@@ -417,7 +417,7 @@ export async function POST(request: NextRequest) {
               cause: fetchError?.cause,
             });
             if (fetchError.name === 'AbortError') {
-              throw new Error('请求超时（8秒）。API响应太慢，建议：1) 压缩图片大小；2) 使用"单张生成"而非批量；3) 升级Vercel Pro版（60秒限制）。');
+              throw new Error('请求超时（45秒）。API响应时间过长，可能原因：1) 图片太大，请压缩图片；2) API服务繁忙。建议稍后重试。');
             }
             throw fetchError;
           }
@@ -530,16 +530,9 @@ export async function POST(request: NextRequest) {
             console.error(`API Response error for ${spec.name}:`, error.status, errorText);
           }
 
-          // Return a default prompt on error
-          return {
-            type: spec.type,
-            name: spec.name,
-            chinesePrompt: `请生成${spec.name}风格的海报，展示产品特点和视觉效果。要求构图合理，光影协调，色彩和谐。`,
-            constraint: '必须保留产品原有特征和设计风格',
-            identificationReport: '',
-            layout: '',
-            fullPrompt: ''
-          };
+          // Re-throw the error to mark this prompt as failed
+          // Do NOT return a generic prompt as it confuses users
+          throw error;
         }
       })
     );
