@@ -441,6 +441,16 @@ export default function Home() {
         throw new Error('返回数据格式错误');
       }
 
+      // Show warning if some prompts failed to generate
+      if (data.warning) {
+        alert(`提示：${data.warning}`);
+      }
+
+      // If no prompts were generated, show error
+      if (data.prompts.length === 0) {
+        throw new Error('未能生成任何提示词，请稍后重试或使用"单张生成"模式');
+      }
+
       const promptsMap: Record<string, PromptData> = {};
       const editedPromptsMap: Record<string, string> = {};
 

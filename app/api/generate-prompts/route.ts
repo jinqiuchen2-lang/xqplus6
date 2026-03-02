@@ -225,7 +225,8 @@ export async function POST(request: NextRequest) {
     console.log('Starting prompt generation for', images.length, 'images');
 
     // Generate prompts for each poster type
-    const prompts = await Promise.all(
+    // Use Promise.allSettled to handle partial failures gracefully
+    const results = await Promise.allSettled(
       PROMPT_SPECS.map(async (spec) => {
         let response: Response;
         try {
@@ -238,8 +239,11 @@ export async function POST(request: NextRequest) {
             .replace('{STYLE}', spec.posterStyle);
 
           // New API streaming request with timeout
+          // Note: Vercel has strict limits (Free: 10s, Pro: 60s)
+          // Set timeout to 40s per request since we make 7 parallel calls
+          // This gives ~50s total budget for all requests to complete
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+          const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 seconds timeout
 
           let content = '';
           let reasoningContent = '';
@@ -414,7 +418,7 @@ export async function POST(request: NextRequest) {
               cause: fetchError?.cause,
             });
             if (fetchError.name === 'AbortError') {
-              throw new Error('请求超时，请稍后重试');
+              throw new Error('请求超时。提示：批量生成需要7个并行API请求，Vercel免费版限制为10秒。建议使用"单张生成"模式或升级Vercel套餐。');
             }
             throw fetchError;
           }
@@ -541,8 +545,41 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    console.log('All prompts generated successfully');
-    return NextResponse.json({ prompts });
+    // Extract successful results and log failures
+    const prompts: any[] = [];
+    let failureCount = 0;
+    let timeoutCount = 0;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        prompts.push(result.value);
+      } else {
+        failureCount++;
+        const error = result.reason;
+        if (error instanceof Error && error.name === 'AbortError') {
+          timeoutCount++;
+        }
+        console.error('Prompt generation failed:', error);
+      }
+    }
+
+    console.log(`Batch generation complete: ${prompts.length} successful, ${failureCount} failed (${timeoutCount} timeouts)`);
+
+    // If all failed, return error
+    if (prompts.length === 0) {
+      return NextResponse.json(
+        { error: '所有提示词生成均失败。建议使用"单张生成"模式或检查网络连接。' },
+        { status: 500 }
+      );
+    }
+
+    // If some failed, include warning in response
+    const responseData: any = { prompts };
+    if (failureCount > 0) {
+      responseData.warning = `${failureCount}个提示词生成失败（${timeoutCount}个超时）。建议稍后重试失败的项目或使用"单张生成"模式。`;
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Error in generate-prompts API:', error);
 

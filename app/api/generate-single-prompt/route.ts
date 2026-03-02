@@ -236,8 +236,10 @@ export async function POST(request: NextRequest) {
       .replace('{STYLE}', spec.posterStyle);
 
     // New API streaming request with timeout
+    // Note: Vercel has strict limits (Free: 10s, Pro: 60s)
+    // Set timeout to 45s to stay within Vercel Pro limits
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds timeout
 
     let content = '';
     let reasoningContent = '';
@@ -416,7 +418,7 @@ export async function POST(request: NextRequest) {
         stack: fetchError?.stack?.substring(0, 500)
       });
       if (fetchError.name === 'AbortError') {
-        throw new Error('请求超时，请稍后重试');
+        throw new Error('请求超时。提示：如果使用Vercel免费版，超时限制为10秒；Pro版为60秒。建议使用"单张生成"模式而非"批量生成"，或者升级Vercel套餐。');
       }
       throw fetchError;
     }
