@@ -240,10 +240,9 @@ export async function POST(request: NextRequest) {
 
           // New API streaming request with timeout
           // Note: Vercel has strict limits (Free: 10s, Pro: 60s)
-          // Set timeout to 40s per request since we make 7 parallel calls
-          // This gives ~50s total budget for all requests to complete
+          // Set timeout to 8s per request to work within Free tier limits
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 seconds timeout
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
 
           let content = '';
           let reasoningContent = '';
@@ -272,8 +271,8 @@ export async function POST(request: NextRequest) {
                 }
               ],
               include_thoughts: true,
-              reasoning_effort: 'high',
-              max_tokens: 1500,
+              reasoning_effort: 'medium',
+              max_tokens: 1000,
             };
 
             console.log(`[${spec.name}] Request to:`, `${API_URL}/gemini-3-flash/v1/chat/completions`);
@@ -418,7 +417,7 @@ export async function POST(request: NextRequest) {
               cause: fetchError?.cause,
             });
             if (fetchError.name === 'AbortError') {
-              throw new Error('请求超时。提示：批量生成需要7个并行API请求，Vercel免费版限制为10秒。建议使用"单张生成"模式或升级Vercel套餐。');
+              throw new Error('请求超时（8秒）。API响应太慢，建议：1) 压缩图片大小；2) 使用"单张生成"而非批量；3) 升级Vercel Pro版（60秒限制）。');
             }
             throw fetchError;
           }
