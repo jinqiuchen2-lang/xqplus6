@@ -270,8 +270,6 @@ export async function POST(request: NextRequest) {
                   ]
                 }
               ],
-              include_thoughts: true,
-              reasoning_effort: 'high',
               max_tokens: 2000,
             };
 
