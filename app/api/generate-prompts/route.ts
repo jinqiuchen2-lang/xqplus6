@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_KEY = process.env.API_KEY;
-const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
+const API_URL = 'https://api.kie.ai';
+const API_KEY = '807879c0a162f5fcf7a21424df184ea1';
+const MODEL_NAME = 'gemini-3-flash';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS = [
@@ -237,19 +237,19 @@ export async function POST(request: NextRequest) {
             .replace('{POSTER_NAME}', spec.name)
             .replace('{STYLE}', spec.posterStyle);
 
-          response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
+          // New API streaming request
+          let reasoningContent = '';
+          let finalContent = '';
+          let creditsConsumed = 0;
+
+          response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${API_KEY}`,
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'application/json',
-              'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-              'Accept-Encoding': 'gzip, deflate, br',
-              'Connection': 'keep-alive',
+              'Accept': 'text/event-stream',
             },
             body: JSON.stringify({
-              model: MODEL_NAME,
               messages: [
                 {
                   role: 'system',
@@ -269,32 +269,81 @@ export async function POST(request: NextRequest) {
                   ]
                 }
               ],
-              max_tokens: 1500, // Reduced from 2000
+              include_thoughts: true,
+              reasoning_effort: 'high',
+              max_tokens: 1500,
             }),
           });
 
           if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`API Error for ${spec.name}:`, response.status, errorText);
+            const errorText = await response.text();
+            console.error(`API Error for ${spec.name}:`, response.status, errorText);
 
-          // Provide more specific error messages
-          let errorMessage = `API request failed: ${response.statusText}`;
-          if (response.status === 401) {
-            errorMessage = 'API密钥无效，请检查配置';
-          } else if (response.status === 403) {
-            errorMessage = 'API访问被拒绝，请检查权限';
-          } else if (response.status === 429) {
-            errorMessage = '请求过于频繁，请稍后再试';
-          } else if (response.status >= 500) {
-            errorMessage = 'API服务暂时不可用，请稍后重试';
+            // Provide more specific error messages
+            let errorMessage = `API request failed: ${response.statusText}`;
+            if (response.status === 401) {
+              errorMessage = 'API密钥无效，请检查配置';
+            } else if (response.status === 403) {
+              errorMessage = 'API访问被拒绝，请检查权限';
+            } else if (response.status === 429) {
+              errorMessage = '请求过于频繁，请稍后再试';
+            } else if (response.status >= 500) {
+              errorMessage = 'API服务暂时不可用，请稍后重试';
+            }
+
+            throw new Error(errorMessage);
           }
 
-          throw new Error(errorMessage);
-        }
+          // Process streaming response
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
+          if (!reader) {
+            throw new Error('无法读取响应流');
+          }
+
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+              const dataStr = trimmedLine.slice(6).trim();
+              if (dataStr === '[DONE]') continue;
+
+              try {
+                const data = JSON.parse(dataStr);
+                const delta = data.choices?.[0]?.delta;
+
+                if (delta?.reasoning_content) {
+                  reasoningContent += delta.reasoning_content;
+                }
+
+                if (delta?.content) {
+                  finalContent += delta.content;
+                }
+
+                // Check for credits_consumed in the last packet
+                if (data.credits_consumed !== undefined) {
+                  creditsConsumed = data.credits_consumed;
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+
+          const content = finalContent;
+          console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
+          console.log(`Reasoning content for ${spec.name}:`, reasoningContent.substring(0, 200));
+          console.log(`Credits consumed for ${spec.name}:`, creditsConsumed);
 
         // Parse the response to extract components
         let chinesePrompt = '';

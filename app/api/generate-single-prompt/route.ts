@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_KEY = process.env.API_KEY;
-const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-pro-preview';
-const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || 'nano-banana-2';
+const API_URL = 'https://api.kie.ai';
+const API_KEY = '807879c0a162f5fcf7a21424df184ea1';
+const MODEL_NAME = 'gemini-3-flash';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle: string; instruction: string }> = {
@@ -236,42 +235,43 @@ export async function POST(request: NextRequest) {
       .replace('{POSTER_NAME}', spec.name)
       .replace('{STYLE}', spec.posterStyle);
 
-    let response: Response;
-    response = await fetchWithRetry(`${API_URL}/v1/chat/completions`, {
+    // New API streaming request
+    let reasoningContent = '';
+    let finalContent = '';
+    let creditsConsumed = 0;
+
+    const response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
+        'Accept': 'text/event-stream',
       },
       body: JSON.stringify({
-          model: MODEL_NAME,
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
-                },
-                ...images.map((img: string) => ({
-                  type: 'image_url',
-                  image_url: { url: img },
-                })),
-              ],
-            },
-          ],
-          max_tokens: 1500, // Reduced from 2000
-        }),
-      });
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
+              },
+              ...images.map((img: string) => ({
+                type: 'image_url',
+                image_url: { url: img },
+              })),
+            ],
+          },
+        ],
+        include_thoughts: true,
+        reasoning_effort: 'high',
+        max_tokens: 1500,
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -292,9 +292,58 @@ export async function POST(request: NextRequest) {
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    // Process streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error('无法读取响应流');
+    }
+
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+        const dataStr = trimmedLine.slice(6).trim();
+        if (dataStr === '[DONE]') continue;
+
+        try {
+          const data = JSON.parse(dataStr);
+          const delta = data.choices?.[0]?.delta;
+
+          if (delta?.reasoning_content) {
+            reasoningContent += delta.reasoning_content;
+            console.log('Reasoning content received:', delta.reasoning_content.substring(0, 100));
+          }
+
+          if (delta?.content) {
+            finalContent += delta.content;
+          }
+
+          // Check for credits_consumed in the last packet
+          if (data.credits_consumed !== undefined) {
+            creditsConsumed = data.credits_consumed;
+            console.log('Credits consumed:', creditsConsumed);
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+
+    const content = finalContent;
     console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
+    console.log(`Reasoning content for ${spec.name}:`, reasoningContent.substring(0, 200));
+    console.log(`Credits consumed for ${spec.name}:`, creditsConsumed);
 
     // Parse the response to extract components
     let chinesePrompt = '';
