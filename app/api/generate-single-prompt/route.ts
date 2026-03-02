@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kie.ai';
-const API_KEY = process.env.API_KEY || '807879c0a162f5fcf7a21424df184ea1';
-const MODEL_NAME = process.env.MODEL_NAME || 'gemini-3-flash';
+const API_URL = 'https://api.kie.ai';
+const API_KEY = '807879c0a162f5fcf7a21424df184ea1';
+const MODEL_NAME = 'gemini-3-flash';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle: string; instruction: string }> = {
@@ -254,7 +254,6 @@ export async function POST(request: NextRequest) {
 
     try {
       const requestBody = {
-        model: MODEL_NAME,
         messages: [
           {
             role: 'system',
@@ -277,11 +276,11 @@ export async function POST(request: NextRequest) {
         max_tokens: 2000,
       };
 
-      console.log('Request to:', `${API_URL}/v1/chat/completions`);
+      console.log('Request to:', `${API_URL}/gemini-3-flash/v1/chat/completions`);
       console.log('Request body size:', JSON.stringify(requestBody).length);
       console.log('Starting fetch request...');
 
-      const response = await fetch(`${API_URL}/v1/chat/completions`, {
+      const response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
