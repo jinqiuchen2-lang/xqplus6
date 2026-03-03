@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
             }
 
             const requestBody = {
+              model: MODEL_NAME,
               messages: [
                 {
                   role: 'system',
