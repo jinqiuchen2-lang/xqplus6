@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_URL = 'https://api.kie.ai';
-const API_KEY = '807879c0a162f5fcf7a21424df184ea1';
-const MODEL_NAME = 'gemini-3-flash';
+const API_URL = process.env.PROMPT_API_URL || 'https://c-z0-api-01.hash070.com';
+const API_KEY = process.env.PROMPT_API_KEY || '';
+const MODEL_NAME = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS = [
@@ -279,11 +279,11 @@ export async function POST(request: NextRequest) {
               max_tokens: 2000,
             };
 
-            console.log(`[${spec.name}] Request to:`, `${API_URL}/gemini-3-flash/v1/chat/completions`);
+            console.log(`[${spec.name}] Request to:`, `${API_URL}/v1/chat/completions`);
             console.log(`[${spec.name}] Using KIE image URLs:`, images);
             console.log(`[${spec.name}] Starting fetch request...`);
 
-            response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {
+            response = await fetch(`${API_URL}/v1/chat/completions`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
