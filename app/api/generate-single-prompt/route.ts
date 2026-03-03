@@ -277,6 +277,7 @@ export async function POST(request: NextRequest) {
       };
 
       console.log('Request to:', `${API_URL}/gemini-3-flash/v1/chat/completions`);
+      console.log('Using KIE image URLs:', images);
       console.log('Request body size:', JSON.stringify(requestBody).length);
       console.log('Starting fetch request...');
 

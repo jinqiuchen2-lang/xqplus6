@@ -280,6 +280,7 @@ export async function POST(request: NextRequest) {
             };
 
             console.log(`[${spec.name}] Request to:`, `${API_URL}/gemini-3-flash/v1/chat/completions`);
+            console.log(`[${spec.name}] Using KIE image URLs:`, images);
             console.log(`[${spec.name}] Starting fetch request...`);
 
             response = await fetch(`${API_URL}/gemini-3-flash/v1/chat/completions`, {

@@ -377,13 +377,6 @@ export default function Home() {
       return;
     }
 
-    // Check image sizes before sending
-    const sizeCheck = checkImageSizes(uploadedImages);
-    if (!sizeCheck.valid) {
-      alert(sizeCheck.message);
-      return;
-    }
-
     setIsGeneratingPrompts(true);
 
     // Fetch with timeout helper
@@ -405,11 +398,46 @@ export default function Home() {
     };
 
     try {
+      // Step 1: Upload images to KIE storage first
+      console.log('=== Uploading images to KIE storage for batch prompt generation ===');
+      const kieUrls: string[] = [];
+
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const img = uploadedImages[i];
+        console.log(`Uploading image ${i + 1}/${uploadedImages.length} to KIE...`);
+
+        try {
+          const uploadResponse = await fetch('/api/upload-to-kie', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64Data: img.dataUrl,
+              fileName: `batch-prompt-${Date.now()}-${i}.png`,
+            }),
+          });
+
+          if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json();
+            throw new Error(errorData.error || '上传到KIE失败');
+          }
+
+          const uploadData = await uploadResponse.json();
+          kieUrls.push(uploadData.url);
+          console.log(`Image ${i + 1} uploaded to KIE: ${uploadData.url}`);
+        } catch (error) {
+          console.error(`Failed to upload image ${i + 1} to KIE:`, error);
+          throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
+      }
+
+      console.log('All images uploaded to KIE, URLs:', kieUrls);
+
+      // Step 2: Generate prompts using KIE URLs
       const response = await fetchWithTimeout('/api/generate-prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: uploadedImages.map((img) => img.dataUrl),
+          images: kieUrls,  // Send KIE URLs instead of base64
         }),
       });
 
@@ -489,21 +517,49 @@ export default function Home() {
       return;
     }
 
-    // Check image sizes before sending
-    const sizeCheck = checkImageSizes(uploadedImages);
-    if (!sizeCheck.valid) {
-      alert(sizeCheck.message);
-      return;
-    }
-
     setIsGeneratingSinglePrompt(true);
 
     try {
+      // Step 1: Upload images to KIE storage first
+      console.log('=== Uploading images to KIE storage ===');
+      const kieUrls: string[] = [];
+
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const img = uploadedImages[i];
+        console.log(`Uploading image ${i + 1}/${uploadedImages.length} to KIE...`);
+
+        try {
+          const uploadResponse = await fetch('/api/upload-to-kie', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64Data: img.dataUrl,
+              fileName: `prompt-${Date.now()}-${i}.png`,
+            }),
+          });
+
+          if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json();
+            throw new Error(errorData.error || '上传到KIE失败');
+          }
+
+          const uploadData = await uploadResponse.json();
+          kieUrls.push(uploadData.url);
+          console.log(`Image ${i + 1} uploaded to KIE: ${uploadData.url}`);
+        } catch (error) {
+          console.error(`Failed to upload image ${i + 1} to KIE:`, error);
+          throw new Error(`图片上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
+      }
+
+      console.log('All images uploaded to KIE, URLs:', kieUrls);
+
+      // Step 2: Generate prompt using KIE URLs
       const response = await fetch('/api/generate-single-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: uploadedImages.map((img) => img.dataUrl),
+          images: kieUrls,  // Send KIE URLs instead of base64
           posterType: activeTab,
         }),
       });
