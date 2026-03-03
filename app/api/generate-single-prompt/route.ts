@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_URL = process.env.PROMPT_API_URL || 'https://c-z0-api-01.hash070.com';
-const API_KEY = process.env.PROMPT_API_KEY || '';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://api.ohmygpt.com/v1/chat/completions';
+const API_KEY = process.env.GEMINI_API_KEY || '';
 const MODEL_NAME = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview';
 
 // Prompt specifications for the 7 poster types
@@ -159,49 +159,9 @@ Step 4: Generate Complete Prompt (System Refined)
 - 不要添加"希望对您有帮助"、"祝您创作顺利"等客套话
 `;
 
-// Helper function to fetch with retry
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2, timeoutMs = 45000): Promise<Response> {
-  for (let i = 0; i <= maxRetries; i++) {
-    // Create a fresh abort controller for each attempt
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      // Don't retry on client errors (4xx) or 401/403
-      if (response.status < 500 || response.status === 401 || response.status === 403) {
-        return response;
-      }
-      // Log error without consuming response body
-      console.error(`API Error (${response.status}) - will retry`);
-      // Retry on 5xx errors
-      if (i < maxRetries) {
-        console.log(`Retry ${i + 1}/${maxRetries} after ${response.status} error`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
-      } else {
-        // Last attempt failed, throw the response for error handling
-        throw response;
-      }
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (i === maxRetries) {
-        throw error;
-      }
-      console.log(`Retry ${i + 1}/${maxRetries} after error`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
-
 export async function POST(request: NextRequest) {
   console.log('=== generate-single-prompt API called ===');
-  console.log('API_URL:', API_URL);
+  console.log('API_BASE_URL:', API_BASE_URL);
   console.log('MODEL_NAME:', MODEL_NAME);
   console.log('API_KEY exists:', !!API_KEY);
   try {
@@ -253,6 +213,24 @@ export async function POST(request: NextRequest) {
     let creditsConsumed = 0;
 
     try {
+      // Build content array with text and images (direct base64)
+      const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+        {
+          type: 'text',
+          text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
+        },
+      ];
+
+      // Add images as base64 data URLs directly
+      for (const img of images) {
+        // If img already has data:image prefix, use it directly; otherwise add it
+        const imageUrl = img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: imageUrl },
+        });
+      }
+
       const requestBody = {
         messages: [
           {
@@ -261,32 +239,22 @@ export async function POST(request: NextRequest) {
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `请根据我上传的图片，为"${spec.name}"（${spec.instruction}）生成海报提示词。严格按照Prompt Spec格式输出。`,
-              },
-              ...images.map((img: string) => ({
-                type: 'image_url',
-                image_url: { url: img },
-              })),
-            ],
+            content: userContent,
           },
         ],
         max_tokens: 2000,
       };
 
-      console.log('Request to:', `${API_URL}/v1/chat/completions`);
-      console.log('Using KIE image URLs:', images);
+      console.log('Request to:', API_BASE_URL);
+      console.log('Using base64 images directly, count:', images.length);
       console.log('Request body size:', JSON.stringify(requestBody).length);
       console.log('Starting fetch request...');
 
-      const response = await fetch(`${API_URL}/v1/chat/completions`, {
+      const response = await fetch(API_BASE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${API_KEY}`,
-          'Accept': 'text/event-stream',
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
@@ -315,104 +283,93 @@ export async function POST(request: NextRequest) {
         throw new Error(errorMessage);
       }
 
-      // Process streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      // Parse response (may be streaming or non-streaming)
+      const contentType = response.headers.get('content-type') || '';
+      const isStreaming = contentType.includes('text/event-stream');
 
-      if (!reader) {
-        throw new Error('无法读取响应流');
-      }
+      if (isStreaming) {
+        // Process streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
 
-      console.log(`[${spec.name}] Starting to read stream...`);
-      let buffer = '';
-      let chunkCount = 0;
-      let isStreamingFormat = false; // Track if response is SSE format
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          console.log(`[${spec.name}] Stream done. Total chunks: ${chunkCount}, Is streaming format: ${isStreamingFormat}`);
-          break;
+        if (!reader) {
+          throw new Error('无法读取响应流');
         }
 
-        chunkCount++;
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
+        console.log(`[${spec.name}] Starting to read stream...`);
+        let buffer = '';
+        let chunkCount = 0;
 
-        // Log first few chunks for debugging
-        if (chunkCount <= 3) {
-          console.log(`[${spec.name}] Chunk ${chunkCount}:`, chunk.substring(0, 200));
-        }
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log(`[${spec.name}] Stream done. Total chunks: ${chunkCount}`);
+            break;
+          }
 
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          chunkCount++;
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
+          // Log first few chunks for debugging
+          if (chunkCount <= 3) {
+            console.log(`[${spec.name}] Chunk ${chunkCount}:`, chunk.substring(0, 200));
+          }
 
-          // Check if this is SSE format
-          if (trimmedLine.startsWith('data: ')) {
-            isStreamingFormat = true;
-            const dataStr = trimmedLine.slice(6).trim();
-            if (dataStr === '[DONE]') continue;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-            try {
-              const data = JSON.parse(dataStr);
-              const delta = data.choices?.[0]?.delta;
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
 
-              if (delta?.reasoning_content) {
-                reasoningContent += delta.reasoning_content;
-                console.log('Reasoning content received:', delta.reasoning_content.substring(0, 100));
-              }
+            if (trimmedLine.startsWith('data: ')) {
+              const dataStr = trimmedLine.slice(6).trim();
+              if (dataStr === '[DONE]') continue;
 
-              if (delta?.content) {
-                finalContent += delta.content;
-              }
+              try {
+                const data = JSON.parse(dataStr);
+                const delta = data.choices?.[0]?.delta;
 
-              if (data.credits_consumed !== undefined) {
-                creditsConsumed = data.credits_consumed;
-                console.log('Credits consumed:', creditsConsumed);
-              }
-            } catch (e) {
-              if (chunkCount <= 5) {
-                console.log(`[${spec.name}] Parse error:`, e instanceof Error ? e.message : e);
+                if (delta?.reasoning_content) {
+                  reasoningContent += delta.reasoning_content;
+                  console.log('Reasoning content received:', delta.reasoning_content.substring(0, 100));
+                }
+
+                if (delta?.content) {
+                  finalContent += delta.content;
+                }
+
+                if (data.credits_consumed !== undefined) {
+                  creditsConsumed = data.credits_consumed;
+                  console.log('Credits consumed:', creditsConsumed);
+                }
+              } catch (e) {
+                if (chunkCount <= 5) {
+                  console.log(`[${spec.name}] Parse error:`, e instanceof Error ? e.message : e);
+                }
               }
             }
-          } else if (!isStreamingFormat && chunkCount <= 3) {
-            // Non-streaming line - might be complete JSON
-            console.log(`[${spec.name}] Non-data line:`, trimmedLine.substring(0, 100));
           }
+        }
+      } else {
+        // Non-streaming response
+        const data = await response.json();
+        console.log(`[${spec.name}] Parsed non-streaming response`);
+
+        if (data.error) {
+          throw new Error(data.error.message || data.msg || 'API Error');
+        }
+
+        if (data.choices?.[0]?.message?.content) {
+          finalContent = data.choices[0].message.content;
         }
       }
 
-      // If no streaming format detected, try to parse the whole buffer as JSON
-      if (!isStreamingFormat && buffer.trim()) {
-        console.log(`[${spec.name}] Attempting to parse as non-streaming JSON...`);
-        try {
-          const data = JSON.parse(buffer.trim());
-          if (data.error) {
-            throw new Error(data.error.message || data.msg || 'API Error');
-          }
-          // Handle non-streaming response format
-          if (data.choices?.[0]?.message?.content) {
-            finalContent = data.choices[0].message.content;
-            console.log(`[${spec.name}] Parsed non-streaming response, content length: ${finalContent.length}`);
-          }
-          if (data.credits_consumed !== undefined) {
-            creditsConsumed = data.credits_consumed;
-          }
-        } catch (e) {
-          console.log(`[${spec.name}] Failed to parse as JSON:`, e instanceof Error ? e.message : e);
-        }
-      }
-
-      console.log(`[${spec.name}] Stream processing complete. Content length: ${finalContent.length}, Reasoning length: ${reasoningContent.length}`);
+      console.log(`[${spec.name}] Response processing complete. Content length: ${finalContent.length}`);
 
       content = finalContent;
       console.log(`Raw response for ${spec.name}:`, content.substring(0, 200));
-      console.log(`Reasoning content for ${spec.name}:`, reasoningContent.substring(0, 200));
-      console.log(`Credits consumed for ${spec.name}:`, creditsConsumed);
 
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
