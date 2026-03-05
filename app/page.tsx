@@ -572,7 +572,7 @@ export default function Home() {
 
   // Generic task status polling function (supports both KIE and Apimart)
   const pollTaskStatus = async (taskId: string, promptText: string, provider: 'kie' | 'apimart') => {
-    const maxAttempts = 60; // Max 3 minutes (3 seconds interval)
+    const maxAttempts = 100; // Max 5 minutes (3 seconds interval)
     const interval = 3000; // 3 seconds
 
     console.log(`=== Starting to poll ${provider.toUpperCase()} task: ${taskId} ===`);
@@ -586,7 +586,13 @@ export default function Home() {
 
         const data = await response.json();
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state, data.rawStatus);
+        // Log full response for debugging
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, {
+          state: data.state,
+          rawStatus: data.rawStatus,
+          hasImageUrl: !!data.imageUrl,
+          _debug: data._debug
+        });
 
         // Handle success state - compatible with multiple status values
         const successStates = ['success', 'completed', 'succeeded'];
@@ -1037,7 +1043,7 @@ export default function Home() {
 
   // Generic task status polling function that returns image URL (for batch generation)
   const pollTaskStatusForResult = async (taskId: string, prompt: string, provider: 'kie' | 'apimart'): Promise<string | null> => {
-    const maxAttempts = 60; // Max 3 minutes (3 seconds interval)
+    const maxAttempts = 100; // Max 5 minutes (3 seconds interval)
     const interval = 3000; // 3 seconds
 
     console.log(`=== Polling ${provider.toUpperCase()} task for result: ${taskId} ===`);
@@ -1052,7 +1058,13 @@ export default function Home() {
 
         const data = await response.json();
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state, data.rawStatus);
+        // Log full response for debugging
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, {
+          state: data.state,
+          rawStatus: data.rawStatus,
+          hasImageUrl: !!data.imageUrl,
+          _debug: data._debug
+        });
 
         // Handle success state - compatible with multiple status values
         const successStates = ['success', 'completed', 'succeeded'];

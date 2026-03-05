@@ -159,37 +159,66 @@ async function checkApimartTaskStatus(taskId: string) {
   // Extract task data - handle multiple response formats
   // Format 1: { data: [{ status, task_id, image_url }] }
   // Format 2: { status, task_id, image_url } (direct)
-  let taskData = apimartData.data?.[0] || apimartData;
+  // Format 3: { data: { status, task_id, image_url } } (single object)
+  let taskData = apimartData.data?.[0] || apimartData.data || apimartData;
 
   if (!taskData) {
+    console.error('APImart response structure:', {
+      hasData: !!apimartData.data,
+      dataKeys: apimartData.data ? Object.keys(apimartData.data) : 'no data',
+      fullResponse: apimartData
+    });
     throw new Error('APImart API未返回任务数据');
   }
 
-  const { status, task_id, image_url, url } = taskData;
+  const { status, task_id, image_url, url, result } = taskData;
 
   console.log('Task status:', status);
   console.log('Task data keys:', Object.keys(taskData));
+  console.log('Full task data:', JSON.stringify(taskData, null, 2));
 
   // Normalize status to our standard format
-  // Apimart statuses: submitted, processing, success, succeeded, completed, failed
+  // Apimart statuses: submitted, processing, success, succeeded, completed, failed, pending
   // Our format: submitted, processing, success, fail
   let state = status?.toLowerCase() || 'unknown';
 
-  // Map completed/succeeded to success
-  if (['completed', 'succeeded'].includes(state)) {
+  console.log('Original status:', status, 'Lowercase:', state);
+
+  // Map various success states to 'success'
+  if (['completed', 'succeeded', 'done', 'finished'].includes(state)) {
+    console.log('Mapping', state, 'to success');
     state = 'success';
   }
 
   // Map failed to fail
-  if (state === 'failed') {
+  if (state === 'failed' || state === 'error') {
+    console.log('Mapping', state, 'to fail');
     state = 'fail';
   }
 
+  // Map pending/processing states
+  if (['pending', 'queued', 'in_progress', 'generating'].includes(state)) {
+    console.log('Mapping', state, 'to processing');
+    state = 'processing';
+  }
+
   // Extract image URL from possible fields
-  const imageUrl = image_url || url;
+  let imageUrl = image_url || url;
+
+  // Also check result field if imageUrl is not available
+  if (!imageUrl && result) {
+    if (typeof result === 'string') {
+      imageUrl = result;
+    } else if (result.url || result.image_url) {
+      imageUrl = result.url || result.image_url;
+    }
+  }
 
   console.log('Normalized state:', state);
   console.log('Image URL exists:', !!imageUrl);
+  if (imageUrl) {
+    console.log('Image URL (first 100 chars):', imageUrl.substring(0, 100));
+  }
 
   // Return task status
   return NextResponse.json({
@@ -197,6 +226,12 @@ async function checkApimartTaskStatus(taskId: string) {
     state,
     imageUrl: imageUrl || null,
     taskId: task_id || taskId,
-    rawStatus: status // Include raw status for debugging
+    rawStatus: status, // Include raw status for debugging
+    _debug: {
+      originalStatus: status,
+      allKeys: Object.keys(taskData),
+      hasImageUrl: !!imageUrl,
+      taskDataSample: JSON.stringify(taskData).substring(0, 500) // First 500 chars
+    }
   });
 }
