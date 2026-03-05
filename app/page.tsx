@@ -562,28 +562,50 @@ export default function Home() {
 
   // Poll KIE task status
   const pollKieTaskStatus = async (taskId: string, promptText: string) => {
-    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
-    const interval = 5000; // 5 seconds
+    await pollTaskStatus(taskId, promptText, 'kie');
+  };
+
+  // Poll Apimart task status
+  const pollApimartTaskStatus = async (taskId: string, promptText: string) => {
+    await pollTaskStatus(taskId, promptText, 'apimart');
+  };
+
+  // Generic task status polling function (supports both KIE and Apimart)
+  const pollTaskStatus = async (taskId: string, promptText: string, provider: 'kie' | 'apimart') => {
+    const maxAttempts = 60; // Max 3 minutes (3 seconds interval)
+    const interval = 3000; // 3 seconds
+
+    console.log(`=== Starting to poll ${provider.toUpperCase()} task: ${taskId} ===`);
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=${provider}`);
         if (!response.ok) {
           throw new Error('查询任务状态失败');
         }
 
         const data = await response.json();
-        const { state, resultJson, failMsg } = data;
 
-        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
 
-        if (state === 'success') {
-          const result = JSON.parse(resultJson);
-          const imageUrl = result.resultUrls?.[0];
+        // Handle success state
+        if (data.state === 'success') {
+          let imageUrl: string | undefined;
+
+          if (provider === 'kie' && data.resultJson) {
+            // KIE returns resultJson containing URLs
+            const result = JSON.parse(data.resultJson);
+            imageUrl = result.resultUrls?.[0];
+          } else if (provider === 'apimart' && data.imageUrl) {
+            // Apimart returns imageUrl directly
+            imageUrl = data.imageUrl;
+          }
 
           if (!imageUrl) {
             throw new Error('未收到图片URL');
           }
+
+          console.log(`Image generated successfully via ${provider.toUpperCase()}:`, imageUrl);
 
           // Display the generated image
           setCurrentGeneratedImage(imageUrl);
@@ -602,15 +624,23 @@ export default function Home() {
           return;
         }
 
-        if (state === 'fail') {
-          throw new Error(failMsg || '图片生成失败');
+        // Handle failed state
+        if (data.state === 'fail') {
+          const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
+          throw new Error(errorMsg || '图片生成失败');
         }
 
-        // Still processing, wait before next poll
+        // Still processing (submitted, processing), wait before next poll
+        console.log(`${provider.toUpperCase()} task still processing, waiting ${interval}ms...`);
         await new Promise(resolve => setTimeout(resolve, interval));
       } catch (error) {
-        console.error('Error polling KIE task status:', error);
-        throw error;
+        console.error(`Error polling ${provider} task status:`, error);
+        // Don't throw on network errors, continue polling
+        if (attempt === maxAttempts - 1) {
+          throw error;
+        }
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, interval));
       }
     }
 
@@ -712,6 +742,13 @@ export default function Home() {
       if (selectedMode === 'kie' && data.taskId) {
         // Poll for task completion
         await pollKieTaskStatus(data.taskId, currentEditedPrompt);
+        return;
+      }
+
+      // Handle Apimart mode (async task)
+      if (selectedMode === 'apimart' && data.taskId) {
+        // Poll for task completion
+        await pollApimartTaskStatus(data.taskId, currentEditedPrompt);
         return;
       }
 
@@ -883,8 +920,9 @@ export default function Home() {
               if (retryResponse.ok) {
                 const retryData = await retryResponse.json();
 
-                if (selectedMode === 'kie' && retryData.taskId) {
-                  const result = await pollKieTaskStatusForResult(retryData.taskId, prompt);
+                if ((selectedMode === 'kie' || selectedMode === 'apimart') && retryData.taskId) {
+                  const pollFn = selectedMode === 'apimart' ? pollApimartTaskStatusForResult : pollKieTaskStatusForResult;
+                  const result = await pollFn(retryData.taskId, prompt);
                   if (result) {
                     results.push({
                       tabId: tab.id,
@@ -912,10 +950,11 @@ export default function Home() {
 
           const data = await response.json();
 
-          // Handle KIE mode (async task)
-          if (selectedMode === 'kie' && data.taskId) {
+          // Handle KIE and Apimart modes (async task)
+          if ((selectedMode === 'kie' || selectedMode === 'apimart') && data.taskId) {
             // Poll for task completion
-            const result = await pollKieTaskStatusForResult(data.taskId, prompt);
+            const pollFn = selectedMode === 'apimart' ? pollApimartTaskStatusForResult : pollKieTaskStatusForResult;
+            const result = await pollFn(data.taskId, prompt);
             if (result) {
               results.push({
                 tabId: tab.id,
@@ -980,52 +1019,72 @@ export default function Home() {
     }
   };
 
-  // Poll KIE task status and return the image URL
+  // Poll KIE task status and return the image URL (for batch generation)
   const pollKieTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
-    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
-    const interval = 5000; // 5 seconds
+    return pollTaskStatusForResult(taskId, prompt, 'kie');
+  };
+
+  // Poll Apimart task status and return the image URL (for batch generation)
+  const pollApimartTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
+    return pollTaskStatusForResult(taskId, prompt, 'apimart');
+  };
+
+  // Generic task status polling function that returns image URL (for batch generation)
+  const pollTaskStatusForResult = async (taskId: string, prompt: string, provider: 'kie' | 'apimart'): Promise<string | null> => {
+    const maxAttempts = 60; // Max 3 minutes (3 seconds interval)
+    const interval = 3000; // 3 seconds
+
+    console.log(`=== Polling ${provider.toUpperCase()} task for result: ${taskId} ===`);
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=${provider}`);
 
         if (!response.ok) {
           throw new Error('查询任务状态失败');
         }
 
         const data = await response.json();
-        const { state, resultJson, failMsg } = data;
 
-        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
 
-        if (state === 'success') {
-          const result = JSON.parse(resultJson);
-          const imageUrl = result.resultUrls?.[0];
+        if (data.state === 'success') {
+          let imageUrl: string | undefined;
+
+          if (provider === 'kie' && data.resultJson) {
+            // KIE returns resultJson containing URLs
+            const result = JSON.parse(data.resultJson);
+            imageUrl = result.resultUrls?.[0];
+          } else if (provider === 'apimart' && data.imageUrl) {
+            // Apimart returns imageUrl directly
+            imageUrl = data.imageUrl;
+          }
 
           if (!imageUrl) {
-            console.error('KIE completed but no URL found');
+            console.error(`${provider.toUpperCase()} completed but no URL found`);
             return null;
           }
 
-          console.log('KIE task completed, image URL:', imageUrl);
+          console.log(`${provider.toUpperCase()} task completed, image URL:`, imageUrl);
           return imageUrl;
         }
 
-        if (state === 'fail') {
-          console.error('KIE task failed:', failMsg);
+        if (data.state === 'fail') {
+          const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
+          console.error(`${provider.toUpperCase()} task failed:`, errorMsg);
           return null;
         }
 
         // Still processing, wait before next poll
         await new Promise(resolve => setTimeout(resolve, interval));
       } catch (error) {
-        console.error('Error polling KIE task status:', error);
+        console.error(`Error polling ${provider} task status:`, error);
         // Continue polling
         await new Promise(resolve => setTimeout(resolve, interval));
       }
     }
 
-    console.error('KIE task timeout');
+    console.error(`${provider.toUpperCase()} task timeout`);
     return null;
   };
 
