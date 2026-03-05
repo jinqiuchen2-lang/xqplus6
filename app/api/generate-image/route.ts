@@ -518,22 +518,32 @@ export async function POST(request: NextRequest) {
       const apimartData = await apimartResponse.json();
       console.log('Apimart API response:', JSON.stringify(apimartData, null, 2));
 
-      // Extract image URL from Apimart response
-      // OpenAI format: { data: [{ url: "..." }] }
+      // Check if response contains task_id (async mode) or url (sync mode)
+      const taskId = apimartData.data?.[0]?.task_id;
       const imageUrl = apimartData.data?.[0]?.url;
 
-      if (!imageUrl) {
-        console.error('Apimart response data:', apimartData);
-        throw new Error('APImart API未返回图片URL');
+      if (taskId) {
+        // Async mode: return taskId for frontend to poll
+        console.log('Apimart mode task created successfully, taskId:', taskId);
+        return NextResponse.json({
+          success: true,
+          taskId,
+          message: '任务已创建，正在生成中...'
+        });
       }
 
-      console.log('Apimart mode image generated successfully, URL:', imageUrl);
+      if (imageUrl) {
+        // Sync mode: return imageUrl directly
+        console.log('Apimart mode image generated successfully, URL:', imageUrl);
+        return NextResponse.json({
+          success: true,
+          imageUrl,
+          message: '图片生成成功（APImart模式）'
+        });
+      }
 
-      return NextResponse.json({
-        success: true,
-        imageUrl,
-        message: '图片生成成功（APImart模式）'
-      });
+      console.error('Apimart response data:', apimartData);
+      throw new Error('APImart API未返回任务ID或图片URL');
     }
 
     // Official mode: use the existing Gemini Pro Image API
