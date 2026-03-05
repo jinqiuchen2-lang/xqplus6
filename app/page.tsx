@@ -1351,19 +1351,19 @@ export default function Home() {
                       padding: '4px 12px',
                       fontSize: '13px',
                       whiteSpace: 'nowrap',
-                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
-                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
+                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
+                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
                       color: 'white',
                       cursor: uploadedImages.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                     onMouseEnter={(e) => {
                       if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
-                        e.currentTarget.style.backgroundColor = '#4366e0';
+                        e.currentTarget.style.backgroundColor = '#7C3AED';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
-                        e.currentTarget.style.backgroundColor = '#5079FF';
+                        e.currentTarget.style.backgroundColor = '#8B5CF6';
                       }
                     }}
                   >
