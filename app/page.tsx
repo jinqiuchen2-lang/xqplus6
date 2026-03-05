@@ -586,10 +586,13 @@ export default function Home() {
 
         const data = await response.json();
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state, data.rawStatus);
 
-        // Handle success state
-        if (data.state === 'success') {
+        // Handle success state - compatible with multiple status values
+        const successStates = ['success', 'completed', 'succeeded'];
+        const isSuccess = successStates.includes(data.state?.toLowerCase());
+
+        if (isSuccess) {
           let imageUrl: string | undefined;
 
           if (provider === 'kie' && data.resultJson) {
@@ -624,8 +627,11 @@ export default function Home() {
           return;
         }
 
-        // Handle failed state
-        if (data.state === 'fail') {
+        // Handle failed state - compatible with multiple status values
+        const failedStates = ['fail', 'failed', 'error'];
+        const isFailed = failedStates.includes(data.state?.toLowerCase());
+
+        if (isFailed) {
           const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
           throw new Error(errorMsg || '图片生成失败');
         }
@@ -1046,9 +1052,13 @@ export default function Home() {
 
         const data = await response.json();
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state, data.rawStatus);
 
-        if (data.state === 'success') {
+        // Handle success state - compatible with multiple status values
+        const successStates = ['success', 'completed', 'succeeded'];
+        const isSuccess = successStates.includes(data.state?.toLowerCase());
+
+        if (isSuccess) {
           let imageUrl: string | undefined;
 
           if (provider === 'kie' && data.resultJson) {
@@ -1069,7 +1079,11 @@ export default function Home() {
           return imageUrl;
         }
 
-        if (data.state === 'fail') {
+        // Handle failed state - compatible with multiple status values
+        const failedStates = ['fail', 'failed', 'error'];
+        const isFailed = failedStates.includes(data.state?.toLowerCase());
+
+        if (isFailed) {
           const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
           console.error(`${provider.toUpperCase()} task failed:`, errorMsg);
           return null;

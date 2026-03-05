@@ -119,13 +119,17 @@ async function checkApimartTaskStatus(taskId: string) {
   console.log('=== Checking Apimart Task Status ===');
   console.log('TaskId:', taskId);
 
+  // Use the correct Apimart task query endpoint: /v1/tasks/{taskId}
+  const apimartTaskUrl = `https://api.apimart.ai/v1/tasks/${taskId}`;
+  console.log('Fetching Apimart task status from:', apimartTaskUrl);
+
   // Add timeout controller for Apimart API (10 seconds)
   const apimartController = new AbortController();
   const apimartTimeoutId = setTimeout(() => apimartController.abort(), 10000);
 
   let apimartResponse: Response;
   try {
-    apimartResponse = await fetch(`${APIMART_IMAGE_API_URL}/${taskId}`, {
+    apimartResponse = await fetch(apimartTaskUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${APIMART_IMAGE_API_KEY}`,
@@ -152,30 +156,47 @@ async function checkApimartTaskStatus(taskId: string) {
   const apimartData = await apimartResponse.json();
   console.log('Apimart API response:', JSON.stringify(apimartData, null, 2));
 
-  // Extract task data
-  // Apimart response format: { code: 200, data: [{ status: 'submitted' | 'processing' | 'success' | 'failed', task_id: '...', url: '...' }] }
-  const taskData = apimartData.data?.[0];
+  // Extract task data - handle multiple response formats
+  // Format 1: { data: [{ status, task_id, image_url }] }
+  // Format 2: { status, task_id, image_url } (direct)
+  let taskData = apimartData.data?.[0] || apimartData;
+
   if (!taskData) {
     throw new Error('APImart API未返回任务数据');
   }
 
-  const { status, url } = taskData;
+  const { status, task_id, image_url, url } = taskData;
 
   console.log('Task status:', status);
+  console.log('Task data keys:', Object.keys(taskData));
 
-  // Map Apimart status to our standard format
-  // Apimart statuses: submitted, processing, success, failed
+  // Normalize status to our standard format
+  // Apimart statuses: submitted, processing, success, succeeded, completed, failed
   // Our format: submitted, processing, success, fail
-  let state = status;
-  if (status === 'failed') {
+  let state = status?.toLowerCase() || 'unknown';
+
+  // Map completed/succeeded to success
+  if (['completed', 'succeeded'].includes(state)) {
+    state = 'success';
+  }
+
+  // Map failed to fail
+  if (state === 'failed') {
     state = 'fail';
   }
+
+  // Extract image URL from possible fields
+  const imageUrl = image_url || url;
+
+  console.log('Normalized state:', state);
+  console.log('Image URL exists:', !!imageUrl);
 
   // Return task status
   return NextResponse.json({
     success: true,
     state,
-    imageUrl: url, // Direct URL from Apimart
-    taskId
+    imageUrl: imageUrl || null,
+    taskId: task_id || taskId,
+    rawStatus: status // Include raw status for debugging
   });
 }
