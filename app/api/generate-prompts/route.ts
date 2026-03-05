@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.ohmygpt.com/v1/chat/completions';
-const API_KEY = process.env.GEMINI_API_KEY || '';
-const MODEL_NAME = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview';
+const API_BASE_URL = process.env.PROMPT_API_BASE_URL || 'https://api.apimart.ai/v1/chat/completions';
+const API_KEY = process.env.PROMPT_API_KEY || '';
+const MODEL_NAME = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview-thinking-apimart';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS = [
