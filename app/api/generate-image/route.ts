@@ -455,26 +455,22 @@ export async function POST(request: NextRequest) {
       console.log('Apimart API URL:', APIMART_IMAGE_API_URL);
       console.log('Model:', APIMART_IMAGE_MODEL);
 
-      // Convert ratio to Apimart format
-      const sizeMap: Record<string, string> = {
-        '1:1': '1024x1024',
-        '2:3': '768x1152',
-        '3:2': '1152x768',
-        '3:4': '768x1024',
-        '4:3': '1024x768',
-        '4:5': '832x1024',
-        '5:4': '1024x832',
-        '9:16': '576x1024',
-        '16:9': '1024x576'
-      };
-      const size = sizeMap[ratio] || '1024x1024';
+      // Apimart Gemini model expects aspect_ratio as a string (e.g., '16:9', '9:16')
+      // Valid ratios: '1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1', '9:16', '16:9', '21:9'
+      const validRatios = ['1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1', '9:16', '16:9', '21:9'];
+
+      // Validate ratio
+      if (!validRatios.includes(ratio)) {
+        console.error(`Invalid ratio for Apimart: ${ratio}. Valid ratios: ${validRatios.join(', ')}`);
+        throw new Error(`不支持的图片比例: ${ratio}`);
+      }
 
       // Create request body for Apimart API
       const requestBody: Record<string, any> = {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt,
         n: 1,
-        size: size
+        aspect_ratio: ratio
       };
 
       // Include image input if available (image-to-image mode)
@@ -489,7 +485,7 @@ export async function POST(request: NextRequest) {
       console.log('Apimart API request:', {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt.substring(0, 100) + '...',
-        size: size,
+        aspect_ratio: ratio,
         hasImage: !!requestBody.image
       });
 
