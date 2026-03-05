@@ -470,17 +470,27 @@ export async function POST(request: NextRequest) {
       const size = sizeMap[ratio] || '1024x1024';
 
       // Create request body for Apimart API
-      const requestBody = {
+      const requestBody: Record<string, any> = {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt,
         n: 1,
         size: size
       };
 
+      // Include image input if available (image-to-image mode)
+      // Otherwise use text-to-image mode
+      if (images.length > 0) {
+        // Use first base64 image
+        const base64Data = images[0].split('base64,')[1];
+        requestBody.image = `data:image/png;base64,${base64Data}`;
+        console.log('Apimart: Using image-to-image mode');
+      }
+
       console.log('Apimart API request:', {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt.substring(0, 100) + '...',
-        size: size
+        size: size,
+        hasImage: !!requestBody.image
       });
 
       // Add timeout controller for Apimart API (3 minutes)
@@ -510,17 +520,24 @@ export async function POST(request: NextRequest) {
 
       if (!apimartResponse.ok) {
         const errorText = await apimartResponse.text();
-        console.error('Apimart API Error Status:', apimartResponse.status);
-        console.error('Apimart API Error Body:', errorText);
+        console.error('=== APIMART API ERROR ===');
+        console.error('Status:', apimartResponse.status);
+        console.error('Headers:', Object.fromEntries(apimartResponse.headers.entries()));
+        console.error('Error Body:', errorText);
+        console.error('Request Body:', JSON.stringify(requestBody, null, 2));
         throw new Error(`APImart API调用失败: ${apimartResponse.status} - ${errorText}`);
       }
 
       const apimartData = await apimartResponse.json();
-      console.log('Apimart API response:', JSON.stringify(apimartData, null, 2));
+      console.log('=== APIMART API RESPONSE ===');
+      console.log('Full response:', JSON.stringify(apimartData, null, 2));
 
       // Check if response contains task_id (async mode) or url (sync mode)
-      const taskId = apimartData.data?.[0]?.task_id;
-      const imageUrl = apimartData.data?.[0]?.url;
+      // Handle multiple response formats
+      const taskId = apimartData.data?.[0]?.task_id || apimartData.data?.task_id || apimartData.task_id;
+      const imageUrl = apimartData.data?.[0]?.url || apimartData.data?.url || apimartData.url;
+
+      console.log('Extracted - taskId:', taskId, 'imageUrl:', imageUrl);
 
       if (taskId) {
         // Async mode: return taskId for frontend to poll
@@ -542,7 +559,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      console.error('Apimart response data:', apimartData);
+      console.error('Apimart response did not contain task_id or url');
       throw new Error('APImart API未返回任务ID或图片URL');
     }
 

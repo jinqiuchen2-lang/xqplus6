@@ -586,19 +586,9 @@ export default function Home() {
 
         const data = await response.json();
 
-        // Log full response for debugging
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, {
-          state: data.state,
-          rawStatus: data.rawStatus,
-          hasImageUrl: !!data.imageUrl,
-          _debug: data._debug
-        });
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
 
-        // Handle success state - compatible with multiple status values
-        const successStates = ['success', 'completed', 'succeeded'];
-        const isSuccess = successStates.includes(data.state?.toLowerCase());
-
-        if (isSuccess) {
+        if (data.state === 'success') {
           let imageUrl: string | undefined;
 
           if (provider === 'kie' && data.resultJson) {
@@ -633,13 +623,9 @@ export default function Home() {
           return;
         }
 
-        // Handle failed state - compatible with multiple status values
-        const failedStates = ['fail', 'failed', 'error'];
-        const isFailed = failedStates.includes(data.state?.toLowerCase());
-
-        if (isFailed) {
-          const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
-          throw new Error(errorMsg || '图片生成失败');
+        if (data.state === 'fail') {
+          const errorMsg = data.failMsg || '图片生成失败';
+          throw new Error(errorMsg);
         }
 
         // Still processing (submitted, processing), wait before next poll
@@ -1058,19 +1044,9 @@ export default function Home() {
 
         const data = await response.json();
 
-        // Log full response for debugging
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, {
-          state: data.state,
-          rawStatus: data.rawStatus,
-          hasImageUrl: !!data.imageUrl,
-          _debug: data._debug
-        });
+        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
 
-        // Handle success state - compatible with multiple status values
-        const successStates = ['success', 'completed', 'succeeded'];
-        const isSuccess = successStates.includes(data.state?.toLowerCase());
-
-        if (isSuccess) {
+        if (data.state === 'success') {
           let imageUrl: string | undefined;
 
           if (provider === 'kie' && data.resultJson) {
@@ -1091,12 +1067,8 @@ export default function Home() {
           return imageUrl;
         }
 
-        // Handle failed state - compatible with multiple status values
-        const failedStates = ['fail', 'failed', 'error'];
-        const isFailed = failedStates.includes(data.state?.toLowerCase());
-
-        if (isFailed) {
-          const errorMsg = provider === 'kie' ? data.failMsg : '图片生成失败';
+        if (data.state === 'fail') {
+          const errorMsg = data.failMsg || '图片生成失败';
           console.error(`${provider.toUpperCase()} task failed:`, errorMsg);
           return null;
         }
@@ -1482,39 +1454,24 @@ export default function Home() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className="btn btn-secondary"
-                  onClick={generateAllImages}
-                  disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
+                  onClick={generateImage}
+                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
                   style={{
                     flex: 1,
-                    backgroundColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
-                    borderColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
+                    backgroundColor: isGeneratingImage || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
+                    borderColor: isGeneratingImage || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
                     color: 'white',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isGeneratingAllImages && hasAnyPrompts) {
+                    if (!isGeneratingImage && currentEditedPrompt) {
                       e.currentTarget.style.backgroundColor = '#7C3AED';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isGeneratingAllImages && hasAnyPrompts) {
+                    if (!isGeneratingImage && currentEditedPrompt) {
                       e.currentTarget.style.backgroundColor = '#8B5CF6';
                     }
                   }}
-                >
-                  {isGeneratingAllImages ? (
-                    <span className="loading">
-                      <span className="spinner" />
-                      生成中...
-                    </span>
-                  ) : (
-                    '生成全部图片'
-                  )}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={generateImage}
-                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
-                  style={{ flex: 1 }}
                 >
                   {isGeneratingImage ? (
                     <span className="loading">
@@ -1523,6 +1480,21 @@ export default function Home() {
                     </span>
                   ) : (
                     '生成单个图片'
+                  )}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={generateAllImages}
+                  disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
+                  style={{ flex: 1 }}
+                >
+                  {isGeneratingAllImages ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成全部图片'
                   )}
                 </button>
               </div>

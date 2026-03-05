@@ -171,7 +171,7 @@ async function checkApimartTaskStatus(taskId: string) {
     throw new Error('APImart API未返回任务数据');
   }
 
-  const { status, task_id, image_url, url, result } = taskData;
+  const { status, task_id, image_url, url, result, error } = taskData;
 
   console.log('Task status:', status);
   console.log('Task data keys:', Object.keys(taskData));
@@ -180,26 +180,26 @@ async function checkApimartTaskStatus(taskId: string) {
   // Normalize status to our standard format
   // Apimart statuses: submitted, processing, success, succeeded, completed, failed, pending
   // Our format: submitted, processing, success, fail
-  let state = status?.toLowerCase() || 'unknown';
+  const originalState = status?.toLowerCase() || 'unknown';
 
-  console.log('Original status:', status, 'Lowercase:', state);
+  console.log('Original status:', status, 'Lowercase:', originalState);
 
-  // Map various success states to 'success'
-  if (['completed', 'succeeded', 'done', 'finished'].includes(state)) {
-    console.log('Mapping', state, 'to success');
+  // Map statuses - use if-else to prevent cascading mapping
+  let state: string;
+
+  if (['success', 'completed', 'succeeded', 'done', 'finished'].includes(originalState)) {
+    console.log('Mapping', originalState, 'to success');
     state = 'success';
-  }
-
-  // Map failed to fail
-  if (state === 'failed' || state === 'error') {
-    console.log('Mapping', state, 'to fail');
+  } else if (originalState === 'failed' || originalState === 'error') {
+    console.log('Mapping', originalState, 'to fail');
     state = 'fail';
-  }
-
-  // Map pending/processing states
-  if (['pending', 'queued', 'in_progress', 'generating'].includes(state)) {
-    console.log('Mapping', state, 'to processing');
+  } else if (['submitted', 'pending', 'queued', 'in_progress', 'generating', 'processing'].includes(originalState)) {
+    console.log('Mapping', originalState, 'to processing');
     state = 'processing';
+  } else {
+    // Keep original status if not recognized
+    console.log('Unknown status:', originalState, 'keeping as is');
+    state = originalState;
   }
 
   // Extract image URL from possible fields
@@ -226,6 +226,7 @@ async function checkApimartTaskStatus(taskId: string) {
     state,
     imageUrl: imageUrl || null,
     taskId: task_id || taskId,
+    failMsg: error?.message || (state === 'fail' ? '图片生成失败' : undefined), // Include error message
     rawStatus: status, // Include raw status for debugging
     _debug: {
       originalStatus: status,
