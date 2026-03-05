@@ -16,6 +16,11 @@ const KIE_API_URL = process.env.KIE_API_URL || 'https://api.kie.ai';
 const KIE_API_KEY = process.env.KIE_API_KEY || '';
 const KIE_MODEL = process.env.KIE_MODEL || 'nano-banana-pro';
 
+// Apimart mode configuration
+const APIMART_IMAGE_API_URL = process.env.APIMART_IMAGE_API_URL || 'https://api.apimart.ai/v1/images/generations';
+const APIMART_IMAGE_API_KEY = process.env.APIMART_IMAGE_API_KEY || '';
+const APIMART_IMAGE_MODEL = process.env.APIMART_IMAGE_MODEL || 'gemini-3-pro-image-preview';
+
 // Helper function to create multipart/form-data body with multiple images
 // Uses indexed field names (image[0], image[1], etc.) for proper multi-image support
 function createFormDataWithImages(
@@ -162,7 +167,7 @@ export async function POST(request: NextRequest) {
     console.log('Constraint:', constraint ? 'YES' : 'NO');
 
     // Validate mode
-    const validModes = ['official', 'proxy', 'kie'];
+    const validModes = ['official', 'proxy', 'kie', 'apimart'];
     if (!validModes.includes(mode)) {
       return NextResponse.json(
         { error: `无效的模式: ${mode}` },
@@ -261,7 +266,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         imageUrl,
-        message: '图片生成成功（中转模式）'
+        message: '图片生成成功（comfly模式）'
       });
     }
 
@@ -430,6 +435,104 @@ export async function POST(request: NextRequest) {
         success: true,
         taskId,
         message: '任务已创建，正在生成中...'
+      });
+    }
+
+    // Apimart mode: use the Apimart image generation API
+    if (mode === 'apimart') {
+      console.log('=== APIMART MODE: gemini-3-pro-image-preview ===');
+
+      // Check if Apimart API key is configured
+      if (!APIMART_IMAGE_API_KEY || APIMART_IMAGE_API_KEY === '') {
+        console.error('Apimart API key is not configured');
+        return NextResponse.json(
+          { error: 'APImart模式暂不可用，请使用其他模式' },
+          { status: 503 }
+        );
+      }
+
+      console.log('Number of images:', images.length);
+      console.log('Apimart API URL:', APIMART_IMAGE_API_URL);
+      console.log('Model:', APIMART_IMAGE_MODEL);
+
+      // Convert ratio to Apimart format
+      const sizeMap: Record<string, string> = {
+        '1:1': '1024x1024',
+        '2:3': '768x1152',
+        '3:2': '1152x768',
+        '3:4': '768x1024',
+        '4:3': '1024x768',
+        '4:5': '832x1024',
+        '5:4': '1024x832',
+        '9:16': '576x1024',
+        '16:9': '1024x576'
+      };
+      const size = sizeMap[ratio] || '1024x1024';
+
+      // Create request body for Apimart API
+      const requestBody = {
+        model: APIMART_IMAGE_MODEL,
+        prompt: fullPrompt,
+        n: 1,
+        size: size
+      };
+
+      console.log('Apimart API request:', {
+        model: APIMART_IMAGE_MODEL,
+        prompt: fullPrompt.substring(0, 100) + '...',
+        size: size
+      });
+
+      // Add timeout controller for Apimart API (3 minutes)
+      const apimartController = new AbortController();
+      const apimartTimeoutId = setTimeout(() => apimartController.abort(), 180000);
+
+      let apimartResponse: Response;
+      try {
+        apimartResponse = await fetch(APIMART_IMAGE_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${APIMART_IMAGE_API_KEY}`
+          },
+          body: JSON.stringify(requestBody),
+          signal: apimartController.signal,
+        });
+        clearTimeout(apimartTimeoutId);
+      } catch (fetchError: any) {
+        clearTimeout(apimartTimeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('Apimart API request timed out after 3 minutes');
+          throw new Error('APImart API请求超时，请稍后重试');
+        }
+        throw fetchError;
+      }
+
+      if (!apimartResponse.ok) {
+        const errorText = await apimartResponse.text();
+        console.error('Apimart API Error Status:', apimartResponse.status);
+        console.error('Apimart API Error Body:', errorText);
+        throw new Error(`APImart API调用失败: ${apimartResponse.status} - ${errorText}`);
+      }
+
+      const apimartData = await apimartResponse.json();
+      console.log('Apimart API response:', JSON.stringify(apimartData, null, 2));
+
+      // Extract image URL from Apimart response
+      // OpenAI format: { data: [{ url: "..." }] }
+      const imageUrl = apimartData.data?.[0]?.url;
+
+      if (!imageUrl) {
+        console.error('Apimart response data:', apimartData);
+        throw new Error('APImart API未返回图片URL');
+      }
+
+      console.log('Apimart mode image generated successfully, URL:', imageUrl);
+
+      return NextResponse.json({
+        success: true,
+        imageUrl,
+        message: '图片生成成功（APImart模式）'
       });
     }
 

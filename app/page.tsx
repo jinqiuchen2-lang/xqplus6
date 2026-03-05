@@ -41,8 +41,9 @@ const RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9']
 const QUALITIES = ['1K', '2K', '4K'];
 const MODES = [
   { id: 'official', name: '官方模式' },
-  { id: 'proxy', name: '中转模式' },
+  { id: 'proxy', name: 'comfly模式' },
   { id: 'kie', name: 'Kie模式' },
+  { id: 'apimart', name: 'APImart模式' },
 ];
 
 // Storage keys
