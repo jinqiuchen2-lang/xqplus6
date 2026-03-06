@@ -1450,15 +1450,15 @@ export default function Home() {
                   <label className="control-label" style={{ marginBottom: 0 }}>提示词（可编辑）</label>
                   {/* 自动生成单个提示词按钮 - 放在label右侧 */}
                   <button
-                    className="btn btn-secondary"
+                    className="btn btn-primary"
                     onClick={generateSinglePrompt}
                     disabled={isGeneratingSinglePrompt || uploadedImages.length === 0}
                     style={{
                       padding: '4px 12px',
                       fontSize: '13px',
                       whiteSpace: 'nowrap',
-                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
-                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
+                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
+                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
                       color: 'white',
                       cursor: uploadedImages.length === 0 ? 'not-allowed' : 'pointer'
                     }}
@@ -1559,6 +1559,36 @@ export default function Home() {
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
+                  className="btn btn-primary"
+                  onClick={generateImage}
+                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
+                    borderColor: isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
+                    color: 'white',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isGeneratingImage && !isGeneratingAllImages && !currentEditedPrompt) {
+                      e.currentTarget.style.backgroundColor = '#7C3AED';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isGeneratingImage && !isGeneratingAllImages && !currentEditedPrompt) {
+                      e.currentTarget.style.backgroundColor = '#8B5CF6';
+                    }
+                  }}
+                >
+                  {isGeneratingImage ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成单个图片'
+                  )}
+                </button>
+                <button
                   className="btn btn-secondary"
                   onClick={generateAllImages}
                   disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
@@ -1586,21 +1616,6 @@ export default function Home() {
                     </span>
                   ) : (
                     '生成全部图片'
-                  )}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={generateImage}
-                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
-                  style={{ flex: 1 }}
-                >
-                  {isGeneratingImage ? (
-                    <span className="loading">
-                      <span className="spinner" />
-                      生成中...
-                    </span>
-                  ) : (
-                    '生成单个图片'
                   )}
                 </button>
               </div>
