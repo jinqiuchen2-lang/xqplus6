@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import JSZip from 'jszip';
 
 // Types
 interface PromptData {
@@ -1174,6 +1175,61 @@ export default function Home() {
     }
   };
 
+  // Download all batch images as a ZIP file
+  const downloadBatchAsZip = async (batchImages: Array<{ tabId: string; tabName: string; url: string; prompt: string }>, batchName: string) => {
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(batchName);
+
+      for (let i = 0; i < batchImages.length; i++) {
+        const img = batchImages[i];
+        let blob: Blob;
+
+        // Check if it's a base64 data URL
+        if (img.url.startsWith('data:')) {
+          // Convert base64 to blob
+          const base64Data = img.url.split(',')[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let j = 0; j < binaryString.length; j++) {
+            bytes[j] = binaryString.charCodeAt(j);
+          }
+          blob = new Blob([bytes], { type: 'image/jpeg' });
+        } else {
+          // Use our proxy API to download the image (avoids CORS issues)
+          const proxyUrl = `/api/download-image?url=${encodeURIComponent(img.url)}`;
+          const response = await fetch(proxyUrl);
+
+          if (!response.ok) {
+            console.error(`Failed to download image ${img.tabName}`);
+            continue;
+          }
+
+          blob = await response.blob();
+        }
+
+        // Add to ZIP
+        folder!.file(`${img.tabName}.jpg`, blob);
+      }
+
+      // Generate ZIP and download
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipUrl = URL.createObjectURL(zipBlob);
+
+      const link = document.createElement('a');
+      link.href = zipUrl;
+      link.download = `${batchName}.zip`;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(zipUrl);
+    } catch (error) {
+      console.error('Error downloading batch as ZIP:', error);
+      alert('打包下载失败，请稍后重试');
+    }
+  };
+
   const openImageModal = (imageUrl: string) => {
     setModalImage(imageUrl);
   };
@@ -1754,14 +1810,7 @@ export default function Home() {
                           </div>
                           <button
                             className="btn btn-secondary btn-download"
-                            onClick={() => {
-                              // Download all batch images
-                              item.batchImages!.forEach((img, i) => {
-                                setTimeout(() => {
-                                  downloadImage(img.url, `${img.tabName}-${item.id}-${i}.jpg`);
-                                }, i * 500);
-                              });
-                            }}
+                            onClick={() => downloadBatchAsZip(item.batchImages!, item.posterType)}
                             style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.backgroundColor = '#e5e7eb';
@@ -1770,7 +1819,7 @@ export default function Home() {
                               e.currentTarget.style.backgroundColor = '#f3f4f6';
                             }}
                           >
-                            下载全部
+                            打包下载(ZIP)
                           </button>
                         </div>
                       </div>
