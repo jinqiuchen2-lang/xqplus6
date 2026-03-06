@@ -40,9 +40,9 @@ const TABS = [
 const RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
 const QUALITIES = ['1K', '2K', '4K'];
 const MODES = [
+  { id: 'apimart', name: 'A线' },
   { id: 'proxy', name: 'C线' },
   { id: 'kie', name: 'K线' },
-  { id: 'apimart', name: 'A线' },
 ];
 
 // Storage keys
@@ -561,49 +561,28 @@ export default function Home() {
 
   // Poll KIE task status
   const pollKieTaskStatus = async (taskId: string, promptText: string) => {
-    await pollTaskStatus(taskId, promptText, 'kie');
-  };
-
-  // Poll Apimart task status
-  const pollApimartTaskStatus = async (taskId: string, promptText: string) => {
-    await pollTaskStatus(taskId, promptText, 'apimart');
-  };
-
-  // Generic task status polling function (supports both KIE and Apimart)
-  const pollTaskStatus = async (taskId: string, promptText: string, provider: 'kie' | 'apimart') => {
-    const maxAttempts = 100; // Max 5 minutes (3 seconds interval)
-    const interval = 3000; // 3 seconds
-
-    console.log(`=== Starting to poll ${provider.toUpperCase()} task: ${taskId} ===`);
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=${provider}`);
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
         if (!response.ok) {
           throw new Error('查询任务状态失败');
         }
 
         const data = await response.json();
+        const { state, resultJson, failMsg } = data;
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
+        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
 
-        if (data.state === 'success') {
-          let imageUrl: string | undefined;
-
-          if (provider === 'kie' && data.resultJson) {
-            // KIE returns resultJson containing URLs
-            const result = JSON.parse(data.resultJson);
-            imageUrl = result.resultUrls?.[0];
-          } else if (provider === 'apimart' && data.imageUrl) {
-            // Apimart returns imageUrl directly
-            imageUrl = data.imageUrl;
-          }
+        if (state === 'success') {
+          const result = JSON.parse(resultJson);
+          const imageUrl = result.resultUrls?.[0];
 
           if (!imageUrl) {
             throw new Error('未收到图片URL');
           }
-
-          console.log(`Image generated successfully via ${provider.toUpperCase()}:`, imageUrl);
 
           // Display the generated image
           setCurrentGeneratedImage(imageUrl);
@@ -622,22 +601,68 @@ export default function Home() {
           return;
         }
 
-        if (data.state === 'fail') {
-          const errorMsg = data.failMsg || '图片生成失败';
-          throw new Error(errorMsg);
+        if (state === 'fail') {
+          throw new Error(failMsg || '图片生成失败');
         }
 
-        // Still processing (submitted, processing), wait before next poll
-        console.log(`${provider.toUpperCase()} task still processing, waiting ${interval}ms...`);
+        // Still processing, wait before next poll
         await new Promise(resolve => setTimeout(resolve, interval));
       } catch (error) {
-        console.error(`Error polling ${provider} task status:`, error);
-        // Don't throw on network errors, continue polling
-        if (attempt === maxAttempts - 1) {
-          throw error;
+        console.error('Error polling KIE task status:', error);
+        throw error;
+      }
+    }
+
+    throw new Error('任务超时，请稍后重试');
+  };
+
+  const pollApimartTaskStatus = async (taskId: string, promptText: string) => {
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=apimart`);
+        if (!response.ok) {
+          throw new Error('查询任务状态失败');
         }
-        // Wait before retry
+
+        const data = await response.json();
+        const { state, imageUrl, failMsg } = data;
+
+        console.log(`Apimart Task Status (attempt ${attempt + 1}):`, state);
+
+        if (state === 'success') {
+          if (!imageUrl) {
+            throw new Error('未收到图片URL');
+          }
+
+          // Display the generated image
+          setCurrentGeneratedImage(imageUrl);
+          setIsGeneratingImage(false);
+
+          // Add to history
+          const newHistoryItem: GeneratedImage = {
+            id: Date.now().toString(),
+            url: imageUrl,
+            prompt: promptText,
+            date: new Date().toLocaleString('zh-CN'),
+            posterType: TABS.find((t) => t.id === activeTab)?.name || activeTab,
+          };
+          const newHistory = [newHistoryItem, ...history].slice(0, MAX_HISTORY_ITEMS);
+          setHistory(newHistory);
+          return;
+        }
+
+        if (state === 'fail') {
+          throw new Error(failMsg || '图片生成失败');
+        }
+
+        // Still processing, wait before next poll
         await new Promise(resolve => setTimeout(resolve, interval));
+      } catch (error) {
+        console.error('Error polling Apimart task status:', error);
+        throw error;
       }
     }
 
@@ -735,17 +760,11 @@ export default function Home() {
 
       const data = await response.json();
 
-      // Handle KIE mode (async task)
-      if (selectedMode === 'kie' && data.taskId) {
+      // Handle KIE or Apimart mode (async task)
+      if ((selectedMode === 'kie' || selectedMode === 'apimart') && data.taskId) {
         // Poll for task completion
-        await pollKieTaskStatus(data.taskId, currentEditedPrompt);
-        return;
-      }
-
-      // Handle Apimart mode (async task)
-      if (selectedMode === 'apimart' && data.taskId) {
-        // Poll for task completion
-        await pollApimartTaskStatus(data.taskId, currentEditedPrompt);
+        const pollFn = selectedMode === 'apimart' ? pollApimartTaskStatus : pollKieTaskStatus;
+        await pollFn(data.taskId, currentEditedPrompt);
         return;
       }
 
@@ -860,6 +879,7 @@ export default function Home() {
 
       // Generate images concurrently using Promise.allSettled
       // This allows multiple images to be generated at the same time
+      // to avoid net::ERR_CONNECTION_CLOSED errors from sequential requests
       console.log(`Starting concurrent generation for ${tabsWithPrompts.length} images...`);
 
       // Create generation promises for all tabs
@@ -952,7 +972,7 @@ export default function Home() {
 
           const data = await response.json();
 
-          // Handle KIE and Apimart modes (async task)
+          // Handle KIE or Apimart mode (async task)
           if ((selectedMode === 'kie' || selectedMode === 'apimart') && data.taskId) {
             // Poll for task completion
             const pollFn = selectedMode === 'apimart' ? pollApimartTaskStatusForResult : pollKieTaskStatusForResult;
@@ -967,7 +987,6 @@ export default function Home() {
               setAllGeneratedImages([...results]);
               return { tab, success: true, url: result };
             }
-            return { tab, success: false };
           } else if (data.imageUrl) {
             // Handle direct image URL response
             results.push({
@@ -1022,72 +1041,98 @@ export default function Home() {
     }
   };
 
-  // Poll KIE task status and return the image URL (for batch generation)
+  // Poll KIE task status and return the image URL
   const pollKieTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
-    return pollTaskStatusForResult(taskId, prompt, 'kie');
-  };
-
-  // Poll Apimart task status and return the image URL (for batch generation)
-  const pollApimartTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
-    return pollTaskStatusForResult(taskId, prompt, 'apimart');
-  };
-
-  // Generic task status polling function that returns image URL (for batch generation)
-  const pollTaskStatusForResult = async (taskId: string, prompt: string, provider: 'kie' | 'apimart'): Promise<string | null> => {
-    const maxAttempts = 100; // Max 5 minutes (3 seconds interval)
-    const interval = 3000; // 3 seconds
-
-    console.log(`=== Polling ${provider.toUpperCase()} task for result: ${taskId} ===`);
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=${provider}`);
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}`);
 
         if (!response.ok) {
           throw new Error('查询任务状态失败');
         }
 
         const data = await response.json();
+        const { state, resultJson, failMsg } = data;
 
-        console.log(`${provider.toUpperCase()} Task Status (attempt ${attempt + 1}/${maxAttempts}):`, data.state);
+        console.log(`KIE Task Status (attempt ${attempt + 1}):`, state);
 
-        if (data.state === 'success') {
-          let imageUrl: string | undefined;
-
-          if (provider === 'kie' && data.resultJson) {
-            // KIE returns resultJson containing URLs
-            const result = JSON.parse(data.resultJson);
-            imageUrl = result.resultUrls?.[0];
-          } else if (provider === 'apimart' && data.imageUrl) {
-            // Apimart returns imageUrl directly
-            imageUrl = data.imageUrl;
-          }
+        if (state === 'success') {
+          const result = JSON.parse(resultJson);
+          const imageUrl = result.resultUrls?.[0];
 
           if (!imageUrl) {
-            console.error(`${provider.toUpperCase()} completed but no URL found`);
+            console.error('KIE completed but no URL found');
             return null;
           }
 
-          console.log(`${provider.toUpperCase()} task completed, image URL:`, imageUrl);
+          console.log('KIE task completed, image URL:', imageUrl);
           return imageUrl;
         }
 
-        if (data.state === 'fail') {
-          const errorMsg = data.failMsg || '图片生成失败';
-          console.error(`${provider.toUpperCase()} task failed:`, errorMsg);
+        if (state === 'fail') {
+          console.error('KIE task failed:', failMsg);
           return null;
         }
 
         // Still processing, wait before next poll
         await new Promise(resolve => setTimeout(resolve, interval));
       } catch (error) {
-        console.error(`Error polling ${provider} task status:`, error);
+        console.error('Error polling KIE task status:', error);
         // Continue polling
         await new Promise(resolve => setTimeout(resolve, interval));
       }
     }
 
-    console.error(`${provider.toUpperCase()} task timeout`);
+    console.error('KIE task timeout');
+    return null;
+  };
+
+  // Poll Apimart task status and return the image URL
+  const pollApimartTaskStatusForResult = async (taskId: string, prompt: string): Promise<string | null> => {
+    const maxAttempts = 120; // Max 10 minutes (5 seconds interval)
+    const interval = 5000; // 5 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`/api/check-task-status?taskId=${taskId}&provider=apimart`);
+
+        if (!response.ok) {
+          throw new Error('查询任务状态失败');
+        }
+
+        const data = await response.json();
+        const { state, imageUrl, failMsg } = data;
+
+        console.log(`Apimart Task Status (attempt ${attempt + 1}):`, state);
+
+        if (state === 'success') {
+          if (!imageUrl) {
+            console.error('Apimart completed but no URL found');
+            return null;
+          }
+
+          console.log('Apimart task completed, image URL:', imageUrl);
+          return imageUrl;
+        }
+
+        if (state === 'fail') {
+          console.error('Apimart task failed:', failMsg);
+          return null;
+        }
+
+        // Still processing, wait before next poll
+        await new Promise(resolve => setTimeout(resolve, interval));
+      } catch (error) {
+        console.error('Error polling Apimart task status:', error);
+        // Continue polling
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+    }
+
+    console.error('Apimart task timeout');
     return null;
   };
 
@@ -1126,66 +1171,6 @@ export default function Home() {
     } catch (error) {
       console.error('Error downloading image:', error);
       alert('下载图片失败，请稍后重试');
-    }
-  };
-
-  // Download all images from a batch as a ZIP file
-  const downloadBatchAsZip = async (images: Array<{ url: string; tabName: string }>, batchId: string) => {
-    const JSZip = (await import('jszip')).default;
-
-    try {
-      const zip = new JSZip();
-
-      // Show loading state
-      alert('正在下载图片并打包，请稍候...');
-
-      // Download all images
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        let blob: Blob;
-
-        // Check if it's a base64 data URL
-        if (img.url.startsWith('data:')) {
-          // Convert base64 to blob
-          const response = await fetch(img.url);
-          blob = await response.blob();
-        } else {
-          // Use our proxy API to download the image
-          const proxyUrl = `/api/download-image?url=${encodeURIComponent(img.url)}`;
-          const response = await fetch(proxyUrl);
-
-          if (!response.ok) {
-            throw new Error(`Failed to download image ${i + 1}`);
-          }
-
-          blob = await response.blob();
-        }
-
-        // Determine file extension from content type
-        const contentType = blob.type || 'image/jpeg';
-        const extension = contentType === 'image/png' ? 'png' : 'jpg';
-        const filename = `${img.tabName}-${batchId}-${i + 1}.${extension}`;
-
-        // Add to ZIP
-        zip.file(filename, blob);
-      }
-
-      // Generate ZIP file
-      const content = await zip.generateAsync({ type: 'blob' });
-      const blobUrl = URL.createObjectURL(content);
-
-      // Download ZIP
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `批量生成-${batchId}.zip`;
-      document.body.appendChild(link);
-      link.click();
-
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Error downloading batch as ZIP:', error);
-      alert('打包下载失败，请稍后重试');
     }
   };
 
@@ -1416,19 +1401,19 @@ export default function Home() {
                       padding: '4px 12px',
                       fontSize: '13px',
                       whiteSpace: 'nowrap',
-                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
-                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
+                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
+                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#5079FF',
                       color: 'white',
                       cursor: uploadedImages.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                     onMouseEnter={(e) => {
                       if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
-                        e.currentTarget.style.backgroundColor = '#7C3AED';
+                        e.currentTarget.style.backgroundColor = '#4366e0';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
-                        e.currentTarget.style.backgroundColor = '#8B5CF6';
+                        e.currentTarget.style.backgroundColor = '#5079FF';
                       }
                     }}
                   >
@@ -1519,39 +1504,24 @@ export default function Home() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className="btn btn-secondary"
-                  onClick={generateImage}
-                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                  onClick={generateAllImages}
+                  disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
                   style={{
                     flex: 1,
-                    backgroundColor: isGeneratingImage || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
-                    borderColor: isGeneratingImage || !currentEditedPrompt ? '#94a3b8' : '#8B5CF6',
+                    backgroundColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
+                    borderColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
                     color: 'white',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isGeneratingImage && currentEditedPrompt) {
+                    if (!isGeneratingAllImages && hasAnyPrompts) {
                       e.currentTarget.style.backgroundColor = '#7C3AED';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isGeneratingImage && currentEditedPrompt) {
+                    if (!isGeneratingAllImages && hasAnyPrompts) {
                       e.currentTarget.style.backgroundColor = '#8B5CF6';
                     }
                   }}
-                >
-                  {isGeneratingImage ? (
-                    <span className="loading">
-                      <span className="spinner" />
-                      生成中...
-                    </span>
-                  ) : (
-                    '生成单个图片'
-                  )}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={generateAllImages}
-                  disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
-                  style={{ flex: 1 }}
                 >
                   {isGeneratingAllImages ? (
                     <span className="loading">
@@ -1560,6 +1530,21 @@ export default function Home() {
                     </span>
                   ) : (
                     '生成全部图片'
+                  )}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={generateImage}
+                  disabled={isGeneratingImage || isGeneratingAllImages || !currentEditedPrompt}
+                  style={{ flex: 1 }}
+                >
+                  {isGeneratingImage ? (
+                    <span className="loading">
+                      <span className="spinner" />
+                      生成中...
+                    </span>
+                  ) : (
+                    '生成单个图片'
                   )}
                 </button>
               </div>
@@ -1592,6 +1577,7 @@ export default function Home() {
                     {allGeneratedImages.map((item, index) => (
                       <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{
+                          position: 'relative',
                           borderRadius: '8px',
                           overflow: 'hidden',
                           border: '1px solid #e5e7eb',
@@ -1603,31 +1589,40 @@ export default function Home() {
                             style={{ width: '100%', height: '200px', objectFit: 'cover', cursor: 'pointer' }}
                             onClick={() => openImageModal(item.url)}
                           />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '6px' }}>
-                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '0',
+                            left: '0',
+                            right: '0',
+                            padding: '6px 8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                            color: 'white',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            textAlign: 'center'
+                          }}>
                             {item.tabName}
                           </div>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
-                            style={{
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              backgroundColor: '#f3f4f6',
-                              borderColor: '#d1d5db',
-                              color: '#374151',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#e5e7eb';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                            }}
-                          >
-                            下载
-                          </button>
                         </div>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            backgroundColor: '#f3f4f6',
+                            borderColor: '#d1d5db',
+                            color: '#374151',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#e5e7eb';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                        >
+                          下载
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1723,26 +1718,6 @@ export default function Home() {
                   {item.isBatch && item.batchImages ? (
                     // Batch item display - match single item structure
                     <>
-                      <div className="history-item-content" style={{ marginTop: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <div className="history-item-date">
-                            {item.posterType} ({item.batchImages!.length} 张) · {item.date}
-                          </div>
-                          <button
-                            className="btn btn-secondary btn-download"
-                            onClick={() => downloadBatchAsZip(item.batchImages!, item.id)}
-                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#e5e7eb';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                            }}
-                          >
-                            下载全部(ZIP)
-                          </button>
-                        </div>
-                      </div>
                       {/* Show batch images thumbnails as main image area */}
                       <div style={{
                         display: 'grid',
@@ -1772,12 +1747,46 @@ export default function Home() {
                           />
                         ))}
                       </div>
+                      <div className="history-item-content">
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <div className="history-item-date">
+                            {item.posterType} ({item.batchImages!.length} 张) · {item.date}
+                          </div>
+                          <button
+                            className="btn btn-secondary btn-download"
+                            onClick={() => {
+                              // Download all batch images
+                              item.batchImages!.forEach((img, i) => {
+                                setTimeout(() => {
+                                  downloadImage(img.url, `${img.tabName}-${item.id}-${i}.jpg`);
+                                }, i * 500);
+                              });
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                          >
+                            下载全部
+                          </button>
+                        </div>
+                      </div>
                     </>
                   ) : (
                     // Single item display
                     <>
-                      <div className="history-item-content" style={{ marginTop: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <img
+                        src={item.url}
+                        alt="生成的海报"
+                        className="history-item-image"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openImageModal(item.url)}
+                      />
+                      <div className="history-item-content">
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                           <div className="history-item-date">
                             {item.posterType} · {item.date}
                           </div>
@@ -1798,13 +1807,6 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
-                      <img
-                        src={item.url}
-                        alt="生成的海报"
-                        className="history-item-image"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => openImageModal(item.url)}
-                      />
                     </>
                   )}
                 </div>
