@@ -40,10 +40,9 @@ const TABS = [
 const RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
 const QUALITIES = ['1K', '2K', '4K'];
 const MODES = [
-  { id: 'official', name: '官方模式' },
-  { id: 'proxy', name: 'comfly模式' },
-  { id: 'kie', name: 'Kie模式' },
-  { id: 'apimart', name: 'APImart模式' },
+  { id: 'proxy', name: 'C线' },
+  { id: 'kie', name: 'K线' },
+  { id: 'apimart', name: 'A线' },
 ];
 
 // Storage keys
@@ -109,7 +108,7 @@ export default function Home() {
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [selectedQuality, setSelectedQuality] = useState('2K');
-  const [selectedMode, setSelectedMode] = useState('kie');
+  const [selectedMode, setSelectedMode] = useState('apimart');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
   const [tabsTriedGenerating, setTabsTriedGenerating] = useState<Record<string, boolean>>({});
@@ -1502,7 +1501,7 @@ export default function Home() {
                 </div>
 
                 <div className="control-group" style={{ flex: 1 }}>
-                  <label className="control-label">模式</label>
+                  <label className="control-label">线路</label>
                   <select
                     className="control-select"
                     value={selectedMode}
