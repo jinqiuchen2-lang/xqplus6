@@ -1605,13 +1605,16 @@ export default function Home() {
                             onClick={() => openImageModal(item.url)}
                           />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '6px' }}>
+                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                            {item.tabName}
+                          </div>
                           <button
                             className="btn btn-secondary"
                             onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
                             style={{
                               padding: '4px 10px',
-                              fontSize: '11px',
+                              fontSize: '12px',
                               backgroundColor: '#f3f4f6',
                               borderColor: '#d1d5db',
                               color: '#374151',
@@ -1625,9 +1628,6 @@ export default function Home() {
                           >
                             下载
                           </button>
-                          <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
-                            {item.tabName}
-                          </div>
                         </div>
                       </div>
                     ))}
