@@ -1593,7 +1593,6 @@ export default function Home() {
                     {allGeneratedImages.map((item, index) => (
                       <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{
-                          position: 'relative',
                           borderRadius: '8px',
                           overflow: 'hidden',
                           border: '1px solid #e5e7eb',
@@ -1605,40 +1604,31 @@ export default function Home() {
                             style={{ width: '100%', height: '200px', objectFit: 'cover', cursor: 'pointer' }}
                             onClick={() => openImageModal(item.url)}
                           />
-                          <div style={{
-                            position: 'absolute',
-                            top: '0',
-                            left: '0',
-                            right: '0',
-                            padding: '6px 8px',
-                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                            color: 'white',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            textAlign: 'center'
-                          }}>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '11px',
+                              backgroundColor: '#f3f4f6',
+                              borderColor: '#d1d5db',
+                              color: '#374151',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                          >
+                            下载
+                          </button>
+                          <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
                             {item.tabName}
                           </div>
                         </div>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => downloadImage(item.url, `${item.tabName}-${Date.now()}.jpg`)}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            backgroundColor: '#f3f4f6',
-                            borderColor: '#d1d5db',
-                            color: '#374151',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#e5e7eb';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f3f4f6';
-                          }}
-                        >
-                          下载
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -1734,6 +1724,26 @@ export default function Home() {
                   {item.isBatch && item.batchImages ? (
                     // Batch item display - match single item structure
                     <>
+                      <div className="history-item-content" style={{ marginTop: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <div className="history-item-date">
+                            {item.posterType} ({item.batchImages!.length} 张) · {item.date}
+                          </div>
+                          <button
+                            className="btn btn-secondary btn-download"
+                            onClick={() => downloadBatchAsZip(item.batchImages!, item.id)}
+                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                          >
+                            下载全部(ZIP)
+                          </button>
+                        </div>
+                      </div>
                       {/* Show batch images thumbnails as main image area */}
                       <div style={{
                         display: 'grid',
@@ -1763,39 +1773,12 @@ export default function Home() {
                           />
                         ))}
                       </div>
-                      <div className="history-item-content">
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <div className="history-item-date">
-                            {item.posterType} ({item.batchImages!.length} 张) · {item.date}
-                          </div>
-                          <button
-                            className="btn btn-secondary btn-download"
-                            onClick={() => downloadBatchAsZip(item.batchImages!, item.id)}
-                            style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#e5e7eb';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                            }}
-                          >
-                            下载全部(ZIP)
-                          </button>
-                        </div>
-                      </div>
                     </>
                   ) : (
                     // Single item display
                     <>
-                      <img
-                        src={item.url}
-                        alt="生成的海报"
-                        className="history-item-image"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => openImageModal(item.url)}
-                      />
-                      <div className="history-item-content">
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <div className="history-item-content" style={{ marginTop: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                           <div className="history-item-date">
                             {item.posterType} · {item.date}
                           </div>
@@ -1816,6 +1799,13 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
+                      <img
+                        src={item.url}
+                        alt="生成的海报"
+                        className="history-item-image"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openImageModal(item.url)}
+                      />
                     </>
                   )}
                 </div>
