@@ -859,13 +859,17 @@ export default function Home() {
         imagesToSend = uploadedImages.map((img) => img.dataUrl);
       }
 
-      // Generate images for each tab sequentially
-      for (const tab of tabsWithPrompts) {
+      // Generate images concurrently using Promise.allSettled
+      // This allows multiple images to be generated at the same time
+      console.log(`Starting concurrent generation for ${tabsWithPrompts.length} images...`);
+
+      // Create generation promises for all tabs
+      const generationPromises = tabsWithPrompts.map(async (tab) => {
         const prompt = editedPrompts[tab.id];
         const promptData = prompts[tab.id];
         const constraint = promptData?.constraint || '';
 
-        console.log(`Generating image for ${tab.name}...`);
+        console.log(`Starting generation for ${tab.name}...`);
 
         try {
           const controller = new AbortController();
@@ -928,7 +932,9 @@ export default function Home() {
                       url: result,
                       prompt: prompt,
                     });
+                    setAllGeneratedImages([...results]);
                   }
+                  return { tab, success: true, url: result };
                 } else if (retryData.imageUrl) {
                   results.push({
                     tabId: tab.id,
@@ -936,14 +942,13 @@ export default function Home() {
                     url: retryData.imageUrl,
                     prompt: prompt,
                   });
+                  setAllGeneratedImages([...results]);
+                  return { tab, success: true, url: retryData.imageUrl };
                 }
-                setAllGeneratedImages([...results]);
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s before next request
-                continue;
               }
             }
 
-            continue; // Skip this tab and continue with others
+            return { tab, success: false };
           }
 
           const data = await response.json();
@@ -960,7 +965,10 @@ export default function Home() {
                 url: result,
                 prompt: prompt,
               });
+              setAllGeneratedImages([...results]);
+              return { tab, success: true, url: result };
             }
+            return { tab, success: false };
           } else if (data.imageUrl) {
             // Handle direct image URL response
             results.push({
@@ -969,22 +977,20 @@ export default function Home() {
               url: data.imageUrl,
               prompt: prompt,
             });
+            setAllGeneratedImages([...results]);
+            return { tab, success: true, url: data.imageUrl };
           }
 
-          // Update results incrementally
-          setAllGeneratedImages([...results]);
-
-          // Wait 5 seconds before next request to avoid rate limiting
-          if (tabsWithPrompts.indexOf(tab) < tabsWithPrompts.length - 1) {
-            console.log('Waiting 5 seconds before next request...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
+          return { tab, success: false };
 
         } catch (error) {
           console.error(`Error generating image for ${tab.name}:`, error);
-          // Continue with next tab
+          return { tab, success: false };
         }
-      }
+      });
+
+      // Wait for all generation promises to settle (either fulfilled or rejected)
+      await Promise.allSettled(generationPromises);
 
       setIsGeneratingAllImages(false);
 
@@ -1121,6 +1127,66 @@ export default function Home() {
     } catch (error) {
       console.error('Error downloading image:', error);
       alert('下载图片失败，请稍后重试');
+    }
+  };
+
+  // Download all images from a batch as a ZIP file
+  const downloadBatchAsZip = async (images: Array<{ url: string; tabName: string }>, batchId: string) => {
+    const JSZip = (await import('jszip')).default;
+
+    try {
+      const zip = new JSZip();
+
+      // Show loading state
+      alert('正在下载图片并打包，请稍候...');
+
+      // Download all images
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        let blob: Blob;
+
+        // Check if it's a base64 data URL
+        if (img.url.startsWith('data:')) {
+          // Convert base64 to blob
+          const response = await fetch(img.url);
+          blob = await response.blob();
+        } else {
+          // Use our proxy API to download the image
+          const proxyUrl = `/api/download-image?url=${encodeURIComponent(img.url)}`;
+          const response = await fetch(proxyUrl);
+
+          if (!response.ok) {
+            throw new Error(`Failed to download image ${i + 1}`);
+          }
+
+          blob = await response.blob();
+        }
+
+        // Determine file extension from content type
+        const contentType = blob.type || 'image/jpeg';
+        const extension = contentType === 'image/png' ? 'png' : 'jpg';
+        const filename = `${img.tabName}-${batchId}-${i + 1}.${extension}`;
+
+        // Add to ZIP
+        zip.file(filename, blob);
+      }
+
+      // Generate ZIP file
+      const content = await zip.generateAsync({ type: 'blob' });
+      const blobUrl = URL.createObjectURL(content);
+
+      // Download ZIP
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `批量生成-${batchId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading batch as ZIP:', error);
+      alert('打包下载失败，请稍后重试');
     }
   };
 
@@ -1704,14 +1770,7 @@ export default function Home() {
                           </div>
                           <button
                             className="btn btn-secondary btn-download"
-                            onClick={() => {
-                              // Download all batch images
-                              item.batchImages!.forEach((img, i) => {
-                                setTimeout(() => {
-                                  downloadImage(img.url, `${img.tabName}-${item.id}-${i}.jpg`);
-                                }, i * 500);
-                              });
-                            }}
+                            onClick={() => downloadBatchAsZip(item.batchImages!, item.id)}
                             style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.backgroundColor = '#e5e7eb';
@@ -1720,7 +1779,7 @@ export default function Home() {
                               e.currentTarget.style.backgroundColor = '#f3f4f6';
                             }}
                           >
-                            下载全部
+                            下载全部(ZIP)
                           </button>
                         </div>
                       </div>

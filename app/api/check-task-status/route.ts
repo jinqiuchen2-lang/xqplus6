@@ -211,6 +211,13 @@ async function checkApimartTaskStatus(taskId: string) {
       imageUrl = result;
     } else if (result.url || result.image_url) {
       imageUrl = result.url || result.image_url;
+    } else if (result.images && Array.isArray(result.images) && result.images.length > 0) {
+      // Apimart specific: result.images[0].url is an array
+      if (Array.isArray(result.images[0].url) && result.images[0].url.length > 0) {
+        imageUrl = result.images[0].url[0];
+      } else if (result.images[0].url) {
+        imageUrl = result.images[0].url;
+      }
     }
   }
 
