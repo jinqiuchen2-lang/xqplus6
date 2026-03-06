@@ -1589,23 +1589,23 @@ export default function Home() {
                   )}
                 </button>
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-primary"
                   onClick={generateAllImages}
                   disabled={isGeneratingAllImages || isGeneratingImage || !hasAnyPrompts}
                   style={{
                     flex: 1,
-                    backgroundColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
-                    borderColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#8B5CF6',
+                    backgroundColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#3B82F6',
+                    borderColor: isGeneratingAllImages || !hasAnyPrompts ? '#94a3b8' : '#3B82F6',
                     color: 'white',
                   }}
                   onMouseEnter={(e) => {
                     if (!isGeneratingAllImages && hasAnyPrompts) {
-                      e.currentTarget.style.backgroundColor = '#7C3AED';
+                      e.currentTarget.style.backgroundColor = '#2563EB';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isGeneratingAllImages && hasAnyPrompts) {
-                      e.currentTarget.style.backgroundColor = '#8B5CF6';
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
                     }
                   }}
                 >
