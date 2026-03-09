@@ -178,9 +178,81 @@ export async function POST(request: NextRequest) {
     // Proxy mode: use the nano-banana-2 API directly
     if (mode === 'proxy') {
       console.log('=== PROXY MODE: nano-banana-2 ===');
+
+      // Extract layout section from the original Chinese prompt before processing
+      // This preserves the specific Chinese text content (titles, labels, etc.)
+      const layoutMatch = fullPrompt.match(/【排版布局】\s*([\s\S]*?)(?=$|【|###|$)/);
+      const originalLayout = layoutMatch ? layoutMatch[1].trim() : null;
+      console.log('Proxy: Original layout extracted:', originalLayout ? 'YES' : 'NO');
+      if (originalLayout) {
+        console.log('Proxy: Layout content:', originalLayout.substring(0, 100) + '...');
+      }
+
+      // Generate English prompt while preserving layout in Chinese
+      let finalPrompt = fullPrompt;
+      let translationSuccess = false;
+
+      if (originalLayout) {
+        console.log('=== Proxy: Translating prompt to English (keeping layout in Chinese) ===');
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          const translationResponse = await fetch(API_URL + '/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: MODEL_NAME,
+              messages: [
+                {
+                  role: 'system',
+                  content: `你是一个专业的提示词翻译专家。将中文提示词翻译成英文。
+
+**重要约束：**
+1. 只翻译描述性语言、场景说明和约束条件为英文
+2. **不要翻译【排版布局】部分的内容**，将排版布局部分完全删除（因为它会单独以原样中文形式添加回去）
+3. 不要添加任何额外的解释或文字说明
+4. 直接输出英文翻译结果`
+                },
+                {
+                  role: 'user',
+                  text: `请将以下提示词翻译成英文（删除【排版布局】部分）：\n\n${fullPrompt}`
+                }
+              ],
+              max_tokens: 1500,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (translationResponse.ok) {
+            const translationData = await translationResponse.json();
+            const translatedPrompt = translationData.choices?.[0]?.message?.content || '';
+            if (translatedPrompt && translatedPrompt.length > 20) {
+              finalPrompt = translatedPrompt.trim();
+              translationSuccess = true;
+              console.log('Proxy: Prompt translated successfully');
+            }
+          }
+        } catch (translationError) {
+          console.log('Proxy: Translation error, will use original prompt:', translationError);
+        }
+      }
+
+      // Append original layout section (in Chinese) to the translated prompt
+      if (originalLayout && translationSuccess) {
+        finalPrompt = finalPrompt + '\n\n【Layout Requirements】\n' + originalLayout;
+        console.log('Proxy: Appended original layout to translated prompt');
+      }
+
       console.log('Number of images to send:', images.length);
       console.log('Proxy API URL:', `${PROXY_API_URL}/v1/images/edits`);
       console.log('Model:', PROXY_MODEL);
+      console.log('Proxy: Final prompt length:', finalPrompt.length);
 
       // Convert all base64 images to buffers with detailed logging
       const imageBuffers = normalizedImages.map((img: string, index: number) => {
@@ -199,7 +271,7 @@ export async function POST(request: NextRequest) {
       const { body, contentType } = createFormDataWithImages(
         {
           model: PROXY_MODEL,
-          prompt: fullPrompt,
+          prompt: finalPrompt,
           response_format: 'url',
           aspect_ratio: ratio,
           image_size: quality
@@ -210,7 +282,7 @@ export async function POST(request: NextRequest) {
       console.log('=== Sending Request to Proxy API ===');
       console.log('Request params:', {
         model: PROXY_MODEL,
-        prompt: fullPrompt.substring(0, 100) + '...',
+        prompt: finalPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
         image_size: quality,
         image_count: imageBuffers.length,
@@ -283,10 +355,81 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Extract layout section from the original Chinese prompt before processing
+      // This preserves the specific Chinese text content (titles, labels, etc.)
+      const layoutMatch = fullPrompt.match(/【排版布局】\s*([\s\S]*?)(?=$|【|###|$)/);
+      const originalLayout = layoutMatch ? layoutMatch[1].trim() : null;
+      console.log('KIE: Original layout extracted:', originalLayout ? 'YES' : 'NO');
+      if (originalLayout) {
+        console.log('KIE: Layout content:', originalLayout.substring(0, 100) + '...');
+      }
+
+      // Generate English prompt while preserving layout in Chinese
+      let finalPrompt = fullPrompt;
+      let translationSuccess = false;
+
+      if (originalLayout) {
+        console.log('=== KIE: Translating prompt to English (keeping layout in Chinese) ===');
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          const translationResponse = await fetch(API_URL + '/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: MODEL_NAME,
+              messages: [
+                {
+                  role: 'system',
+                  content: `你是一个专业的提示词翻译专家。将中文提示词翻译成英文。
+
+**重要约束：**
+1. 只翻译描述性语言、场景说明和约束条件为英文
+2. **不要翻译【排版布局】部分的内容**，将排版布局部分完全删除（因为它会单独以原样中文形式添加回去）
+3. 不要添加任何额外的解释或文字说明
+4. 直接输出英文翻译结果`
+                },
+                {
+                  role: 'user',
+                  text: `请将以下提示词翻译成英文（删除【排版布局】部分）：\n\n${fullPrompt}`
+                }
+              ],
+              max_tokens: 1500,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (translationResponse.ok) {
+            const translationData = await translationResponse.json();
+            const translatedPrompt = translationData.choices?.[0]?.message?.content || '';
+            if (translatedPrompt && translatedPrompt.length > 20) {
+              finalPrompt = translatedPrompt.trim();
+              translationSuccess = true;
+              console.log('KIE: Prompt translated successfully');
+            }
+          }
+        } catch (translationError) {
+          console.log('KIE: Translation error, will use original prompt:', translationError);
+        }
+      }
+
+      // Append the original layout section (in Chinese) to the translated prompt
+      if (originalLayout && translationSuccess) {
+        finalPrompt = finalPrompt + '\n\n【Layout Requirements】\n' + originalLayout;
+        console.log('KIE: Appended original layout to translated prompt');
+      }
+
       console.log('Number of images:', images.length);
       console.log('KIE API URL:', KIE_API_URL);
       console.log('Model:', KIE_MODEL);
       console.log('Image sources:', hasUrls ? 'URLs (from frontend upload)' : 'base64 (will upload to KIE)');
+      console.log('KIE: Final prompt length:', finalPrompt.length);
 
       // Check if images are already KIE URLs (uploaded from frontend)
       // or if they need to be uploaded to KIE storage
@@ -368,7 +511,7 @@ export async function POST(request: NextRequest) {
       const requestBody = {
         model: KIE_MODEL,
         input: {
-          prompt: fullPrompt,
+          prompt: finalPrompt,
           image_input: imageUrls, // Use KIE image URLs
           aspect_ratio: ratio,
           resolution: resolutionMap[quality] || '2K',
@@ -378,7 +521,7 @@ export async function POST(request: NextRequest) {
 
       console.log('KIE API request:', {
         model: KIE_MODEL,
-        prompt: fullPrompt.substring(0, 100) + '...',
+        prompt: finalPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
         resolution: resolutionMap[quality] || '2K',
         image_count: imageUrls.length
