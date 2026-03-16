@@ -110,6 +110,7 @@ export default function Home() {
   const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [selectedQuality, setSelectedQuality] = useState('2K');
   const [selectedMode, setSelectedMode] = useState('apimart');
+  const [selectedPromptApi, setSelectedPromptApi] = useState('A'); // Prompt API selection (A or C)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
   const [tabsTriedGenerating, setTabsTriedGenerating] = useState<Record<string, boolean>>({});
@@ -411,6 +412,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           images: uploadedImages.map((img) => img.dataUrl),
+          promptApi: selectedPromptApi,
         }),
       });
 
@@ -506,6 +508,7 @@ export default function Home() {
         body: JSON.stringify({
           images: uploadedImages.map((img) => img.dataUrl),
           posterType: activeTab,
+          promptApi: selectedPromptApi,
         }),
       });
 
@@ -1446,8 +1449,18 @@ export default function Home() {
             <div className="prompt-controls">
               <div className="control-group">
                 {/* Label with button on the right */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: '8px' }}>
                   <label className="control-label" style={{ marginBottom: 0 }}>提示词（可编辑）</label>
+                  {/* Prompt API selector dropdown */}
+                  <select
+                    className="control-select"
+                    value={selectedPromptApi}
+                    onChange={(e) => setSelectedPromptApi(e.target.value)}
+                    style={{ minWidth: '80px', padding: '4px 8px' }}
+                  >
+                    <option value="A">A</option>
+                    <option value="C">C</option>
+                  </select>
                   {/* 自动生成单个提示词按钮 - 放在label右侧 */}
                   <button
                     className="btn btn-primary"

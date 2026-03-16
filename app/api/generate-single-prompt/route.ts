@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = process.env.PROMPT_API_BASE_URL || 'https://api.apimart.ai/v1/chat/completions';
-const API_KEY = process.env.PROMPT_API_KEY || '';
-const MODEL_NAME = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview-thinking-apimart';
+// Interface A (Apimart) - default
+const API_A_BASE_URL = process.env.PROMPT_API_BASE_URL || 'https://api.apimart.ai/v1/chat/completions';
+const API_A_KEY = process.env.PROMPT_API_KEY || '';
+const API_A_MODEL = process.env.PROMPT_MODEL_NAME || 'gemini-3-flash-preview-thinking-apimart';
+
+// Interface C (Comfly) - new
+const API_C_BASE_URL = process.env.PROMPT_API_C_BASE_URL || 'https://ai.comfly.chat/v1/chat/completions';
+const API_C_KEY = process.env.PROMPT_API_C_KEY || '';
+const API_C_MODEL = process.env.PROMPT_API_C_MODEL || 'gemini-3-flash-preview';
 
 // Prompt specifications for the 7 poster types
 const PROMPT_SPECS: Record<string, { name: string; posterId: string; posterStyle: string; instruction: string }> = {
@@ -161,15 +167,35 @@ Step 4: Generate Complete Prompt (System Refined)
 
 export async function POST(request: NextRequest) {
   console.log('=== generate-single-prompt API called ===');
-  console.log('API_BASE_URL:', API_BASE_URL);
-  console.log('MODEL_NAME:', MODEL_NAME);
-  console.log('API_KEY exists:', !!API_KEY);
   try {
     const body = await request.json();
     console.log('Request body keys:', Object.keys(body));
-    const { images, posterType } = body;
+    const { images, posterType, promptApi = 'A' } = body;
     console.log('Images array length:', images?.length);
     console.log('Poster type:', posterType);
+    console.log('Prompt API selected:', promptApi);
+
+    // Select API configuration based on promptApi parameter
+    let API_BASE_URL: string;
+    let API_KEY: string;
+    let MODEL_NAME: string;
+
+    if (promptApi === 'C') {
+      API_BASE_URL = API_C_BASE_URL;
+      API_KEY = API_C_KEY;
+      MODEL_NAME = API_C_MODEL;
+      console.log('Using Prompt API C (Comfly)');
+    } else {
+      // Default to A (Apimart)
+      API_BASE_URL = API_A_BASE_URL;
+      API_KEY = API_A_KEY;
+      MODEL_NAME = API_A_MODEL;
+      console.log('Using Prompt API A (Apimart)');
+    }
+
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('MODEL_NAME:', MODEL_NAME);
+    console.log('API_KEY exists:', !!API_KEY);
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
