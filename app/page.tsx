@@ -111,6 +111,7 @@ export default function Home() {
   const [selectedQuality, setSelectedQuality] = useState('2K');
   const [selectedMode, setSelectedMode] = useState('apimart');
   const [selectedPromptApi, setSelectedPromptApi] = useState('A'); // Prompt API selection (A or C)
+  const [isPromptApiExpanded, setIsPromptApiExpanded] = useState(false); // Prompt API dropdown expanded state
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
   const [tabsTriedGenerating, setTabsTriedGenerating] = useState<Record<string, boolean>>({});
@@ -1449,18 +1450,64 @@ export default function Home() {
             <div className="prompt-controls">
               <div className="control-group">
                 {/* Label with button on the right */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
                   <label className="control-label" style={{ marginBottom: 0 }}>提示词（可编辑）</label>
-                  {/* Prompt API selector dropdown */}
-                  <select
-                    className="control-select"
-                    value={selectedPromptApi}
-                    onChange={(e) => setSelectedPromptApi(e.target.value)}
-                    style={{ minWidth: '80px', padding: '4px 8px' }}
+                  {/* Prompt API selector dropdown - arrow icon */}
+                  <div
+                    style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                    onClick={() => setIsPromptApiExpanded(!isPromptApiExpanded)}
                   >
-                    <option value="A">A</option>
-                    <option value="C">C</option>
-                  </select>
+                    {/* Arrow icon - always visible */}
+                    <span
+                      style={{
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        marginLeft: '4px',
+                        userSelect: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {isPromptApiExpanded ? '▼' : '▶'}
+                    </span>
+                    {/* Dropdown menu */}
+                    {isPromptApiExpanded && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: '0',
+                          marginTop: '4px',
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          zIndex: 100,
+                          minWidth: '60px'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div
+                          style={{ padding: '4px 8px', cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedPromptApi('A');
+                            setIsPromptApiExpanded(false);
+                          }}
+                        >
+                          A
+                        </div>
+                        <div
+                          style={{ padding: '4px 8px', cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedPromptApi('C');
+                            setIsPromptApiExpanded(false);
+                          }}
+                        >
+                          C
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {/* 自动生成单个提示词按钮 - 放在label右侧 */}
                   <button
                     className="btn btn-primary"
