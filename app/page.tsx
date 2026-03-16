@@ -1536,6 +1536,8 @@ export default function Home() {
                       '生成单个提示词'
                     )}
                   </button>
+                </div>
+
                 {/* Prompt text area and button on the right */}
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <textarea
@@ -1589,6 +1591,7 @@ export default function Home() {
                     ) : (
                       '生成单个提示词'
                     )}
+                  </button>
                 </div>
                 {currentPrompt?.constraint && (
                   <div className="constraint-box">
