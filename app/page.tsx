@@ -1455,6 +1455,7 @@ export default function Home() {
                   {/* Prompt API selector dropdown - arrow icon */}
                   <span
                     style={{
+                      position: 'relative',
                       cursor: 'pointer',
                       fontSize: '12px',
                       marginLeft: '4px',
