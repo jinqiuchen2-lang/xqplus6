@@ -1509,6 +1509,7 @@ export default function Home() {
                     onClick={generateSinglePrompt}
                     disabled={isGeneratingSinglePrompt || uploadedImages.length === 0}
                     style={{
+                      marginLeft: 'auto',
                       padding: '4px 12px',
                       fontSize: '13px',
                       whiteSpace: 'nowrap',
