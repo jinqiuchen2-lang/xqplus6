@@ -1453,23 +1453,18 @@ export default function Home() {
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
                   <label className="control-label" style={{ marginBottom: 0 }}>提示词（可编辑）</label>
                   {/* Prompt API selector dropdown - arrow icon */}
-                  <div
-                    style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                  <span
+                    style={{
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      marginLeft: '4px',
+                      userSelect: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}
                     onClick={() => setIsPromptApiExpanded(!isPromptApiExpanded)}
                   >
-                    {/* Arrow icon - always visible */}
-                    <span
-                      style={{
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        marginLeft: '4px',
-                        userSelect: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      {isPromptApiExpanded ? '▼' : '▶'}
-                    </span>
+                    {isPromptApiExpanded ? '▼' : '▶'}
                     {/* Dropdown menu */}
                     {isPromptApiExpanded && (
                       <div
@@ -1507,7 +1502,7 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </span>
                   {/* 自动生成单个提示词按钮 - 放在label右侧 */}
                   <button
                     className="btn btn-primary"
@@ -1541,24 +1536,60 @@ export default function Home() {
                       '生成单个提示词'
                     )}
                   </button>
+                {/* Prompt text area and button on the right */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <textarea
+                    className="prompt-textarea"
+                    value={currentEditedPrompt}
+                    onChange={(e) => handlePromptChange(e.target.value)}
+                    placeholder={
+                      !tabsTriedGenerating[activeTab]
+                        ? "请点击生成全部提示词或者生成单个提示词"
+                        : (!currentEditedPrompt || currentEditedPrompt.trim().length === 0
+                          ? "提示词生成失败或为空，请重新生成"
+                          : "点击'生成全部提示词'或'生成单个提示词'按钮生成提示词，或手动输入...")
+                    }
+                    style={{
+                      flex: 1,
+                      ...(tabsTriedGenerating[activeTab] && (!currentEditedPrompt || currentEditedPrompt.trim().length === 0)
+                        ? { borderColor: '#ef4444', backgroundColor: '#fef2f2' }
+                        : undefined
+                      )
+                    }}
+                  />
+                  {/* 自动生成单个提示词按钮 */}
+                  <button
+                    className="btn btn-primary"
+                    onClick={generateSinglePrompt}
+                    disabled={isGeneratingSinglePrompt || uploadedImages.length === 0}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '13px',
+                      whiteSpace: 'nowrap',
+                      backgroundColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
+                      borderColor: isGeneratingSinglePrompt || uploadedImages.length === 0 ? '#94a3b8' : '#8B5CF6',
+                      color: 'white',
+                      cursor: uploadedImages.length === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
+                        e.currentTarget.style.backgroundColor = '#4366e0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isGeneratingSinglePrompt && uploadedImages.length > 0) {
+                        e.currentTarget.style.backgroundColor = '#5079FF';
+                      }
+                    }}
+                  >
+                    {isGeneratingSinglePrompt ? (
+                      <span className="loading">
+                        <span className="spinner" style={{ width: 10, height: 10 }} />
+                      </span>
+                    ) : (
+                      '生成单个提示词'
+                    )}
                 </div>
-                <textarea
-                  className="prompt-textarea"
-                  value={currentEditedPrompt}
-                  onChange={(e) => handlePromptChange(e.target.value)}
-                  placeholder={
-                    !tabsTriedGenerating[activeTab]
-                      ? "请点击生成全部提示词或者生成单个提示词"
-                      : (!currentEditedPrompt || currentEditedPrompt.trim().length === 0
-                        ? "提示词生成失败或为空，请重新生成"
-                        : "点击'生成全部提示词'或'生成单个提示词'按钮生成提示词，或手动输入...")
-                  }
-                  style={
-                    tabsTriedGenerating[activeTab] && (!currentEditedPrompt || currentEditedPrompt.trim().length === 0)
-                      ? { borderColor: '#ef4444', backgroundColor: '#fef2f2' }
-                      : undefined
-                  }
-                />
                 {currentPrompt?.constraint && (
                   <div className="constraint-box">
                     <div className="constraint-label">
