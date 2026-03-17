@@ -613,7 +613,8 @@ export async function POST(request: NextRequest) {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt,
         n: 1,
-        aspect_ratio: ratio
+        aspect_ratio: ratio,
+        imageSize: quality
       };
 
       // Include image input if available (image-to-image mode)
@@ -629,6 +630,7 @@ export async function POST(request: NextRequest) {
         model: APIMART_IMAGE_MODEL,
         prompt: fullPrompt.substring(0, 100) + '...',
         aspect_ratio: ratio,
+        imageSize: quality,
         hasImage: !!requestBody.image
       });
 
