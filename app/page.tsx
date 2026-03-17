@@ -110,7 +110,7 @@ export default function Home() {
   const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [selectedQuality, setSelectedQuality] = useState('2K');
   const [selectedMode, setSelectedMode] = useState('apimart');
-  const [selectedPromptApi, setSelectedPromptApi] = useState('A'); // Prompt API selection (A or C)
+  const [selectedPromptApi, setSelectedPromptApi] = useState('C'); // Prompt API selection (A or C)
   const [isPromptApiExpanded, setIsPromptApiExpanded] = useState(false); // Prompt API dropdown expanded state
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
