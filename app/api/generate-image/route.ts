@@ -620,10 +620,13 @@ export async function POST(request: NextRequest) {
       // Include image input if available (image-to-image mode)
       // Otherwise use text-to-image mode
       if (images.length > 0) {
-        // Use first base64 image
-        const base64Data = images[0].split('base64,')[1];
-        requestBody.image = `data:image/png;base64,${base64Data}`;
-        console.log('Apimart: Using image-to-image mode');
+        // Use all images as base64 array
+        const base64Images = images.map(img => {
+          const base64Data = img.split('base64,')[1];
+          return `data:image/png;base64,${base64Data}`;
+        });
+        requestBody.images = base64Images;
+        console.log(`Apimart: Using image-to-image mode with ${base64Images.length} image(s)`);
       }
 
       console.log('Apimart API request:', {
@@ -631,7 +634,7 @@ export async function POST(request: NextRequest) {
         prompt: fullPrompt.substring(0, 100) + '...',
         size: ratio,
         resolution: quality,
-        hasImage: !!requestBody.image
+        imageCount: requestBody.images?.length || 0
       });
 
       // Add timeout controller for Apimart API (3 minutes)
